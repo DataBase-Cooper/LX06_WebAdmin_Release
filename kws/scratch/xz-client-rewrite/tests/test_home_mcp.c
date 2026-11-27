@@ -37,6 +37,8 @@ static void await_reply(xz_home_mcp *state, xz_ws *ws, uint64_t now) {
 #define RPC(id, method) "{\"jsonrpc\":\"2.0\",\"id\":" id ",\"method\":\"" method "\""
 #define ACTION(id, device, action) RPC(id, "tools/call") ",\"params\":{\"name\":\"self.smart_home.control\"," \
     "\"arguments\":{\"device\":\"" device "\",\"action\":\"" action "\"}}}"
+#define MODE(id, device, mode) RPC(id, "tools/call") ",\"params\":{\"name\":\"self.smart_home.control\"," \
+    "\"arguments\":{\"device\":\"" device "\",\"action\":\"mode\",\"mode\":\"" mode "\"}}}"
 
 int main(void) {
     char tmp[] = "/tmp/lx06-home-mcp-test.XXXXXX";
@@ -51,6 +53,7 @@ int main(void) {
           "  次卧灯) printf '{\"code\":-1}\\n';;\n"
           "  书房灯) exec /bin/sleep 8;;\n"
           "  客厅窗帘) printf '%s\\n' \"$2\" >> curtain-count; printf '{\"code\":0}\\n';;\n"
+          "  客厅空调) printf '%s:%s\\n' \"$2\" \"$4\" >> ac-count; printf '{\"code\":0}\\n';;\n"
           "  *) exit 2;;\n"
           "esac\n", f);
     assert(!fclose(f));
@@ -105,8 +108,26 @@ int main(void) {
     assert(f && fgets(count, sizeof(count), f) && !strcmp(count, "off\n"));
     assert(fgets(count, sizeof(count), f) && !strcmp(count, "on\n"));
     assert(!fgets(count, sizeof(count), f) && !fclose(f) && !unlink("curtain-count"));
+    assert(!xz_home_mcp_voice(&state, &ws, "如何把客厅空调调到制热模式？", 18000));
+    assert(!xz_home_mcp_voice(&state, &ws, "关闭客厅窗帘开制热", 18001));
+    assert(xz_home_mcp_voice(&state, &ws, "关闭客厅的空调。", 18002) == 1);
+    call(&state, &ws, "test-turn", ACTION("12", "客厅空调", "off"), 18003, 0);
+    await_reply(&state, &ws, 18004);
+    assert(strstr(response, "\"id\":12") && strstr(response, "\"isError\":false"));
+    assert(xz_home_mcp_voice(&state, &ws, "把客厅的空调调成制冷模式。", 20000) == 1);
+    await_reply(&state, &ws, 20001);
+    call(&state, &ws, "test-turn", MODE("13", "客厅空调", "cool"), 23000, 0);
+    assert(!state.pid && strstr(response, "\"isError\":false"));
+    call(&state, &ws, "test-turn", MODE("14", "客厅的空调", "heat"), 24000, 0);
+    await_reply(&state, &ws, 24001);
+    assert(strstr(response, "\"id\":14") && strstr(response, "\"isError\":false"));
+    f = fopen("ac-count", "r");
+    assert(f && fgets(count, sizeof(count), f) && !strcmp(count, "off:\n"));
+    assert(fgets(count, sizeof(count), f) && !strcmp(count, "mode:cool\n"));
+    assert(fgets(count, sizeof(count), f) && !strcmp(count, "mode:heat\n"));
+    assert(!fgets(count, sizeof(count), f) && !fclose(f) && !unlink("ac-count"));
     assert(!unlink("mijia_mcp.sh"));
-    call(&state, &ws, "test-turn", ACTION("12", "客厅灯", "on"), 18000, 0);
+    call(&state, &ws, "test-turn", ACTION("15", "客厅灯", "on"), 26000, 0);
     assert(!state.pid && strstr(response, "-32001"));
     assert(!unlink("link.sh") && !chdir("/") && !rmdir(tmp));
     return 0;

@@ -13,7 +13,7 @@ typedef struct {
     size_t used;
     char reply[1024];
     char id[96];
-    char device[97], action[24], value[4];
+    char device[97], action[24], value[8];
     uint64_t requested_at;
     int from_voice, accepted;
 } xz_home_mcp;

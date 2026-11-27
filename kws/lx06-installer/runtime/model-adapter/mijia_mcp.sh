@@ -12,6 +12,17 @@ fi
 case "$2" in
     on) command_text="打开$3";;
     off) command_text="关闭$3";;
+    mode)
+        case "$3" in *空调) ;; *) exit 2;; esac
+        case "$4" in
+            cool) mode_text=制冷;;
+            heat) mode_text=制热;;
+            auto) mode_text=自动;;
+            dry) mode_text=除湿;;
+            fan) mode_text=送风;;
+            *) exit 2;;
+        esac
+        command_text="把${3}调到${mode_text}模式";;
     brightness|temperature)
         case "$4" in [1-9]|[1-9][0-9]|100) ;; *) exit 2;; esac
         if [ "$2" = brightness ]; then

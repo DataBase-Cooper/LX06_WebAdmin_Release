@@ -25,8 +25,38 @@ static const char list[] =
     "\"inputSchema\":{\"type\":\"object\",\"required\":[\"device\",\"action\"],"
     "\"additionalProperties\":false,\"properties\":{"
     "\"device\":{\"type\":\"string\",\"description\":\"设备名或房间加设备名\"},"
-    "\"action\":{\"type\":\"string\",\"enum\":[\"on\",\"off\",\"brightness\",\"temperature\"]},"
-    "\"value\":{\"type\":\"integer\",\"description\":\"亮度百分比或空调摄氏度，仅调节时填写\"}}}}]}";
+    "\"action\":{\"type\":\"string\",\"enum\":[\"on\",\"off\",\"brightness\",\"temperature\",\"mode\"]},"
+    "\"value\":{\"type\":\"integer\",\"description\":\"亮度百分比或空调摄氏度，仅调节时填写\"},"
+    "\"mode\":{\"type\":\"string\",\"enum\":[\"cool\",\"heat\",\"auto\",\"dry\",\"fan\"],"
+    "\"description\":\"切换空调模式时填写，分别是制冷、制热、自动、除湿、送风\"}}}}]}";
+
+static const char *const types[] = {"窗帘", "灯", "风扇", "空调", "空气净化器", "净化器",
+                                    "加湿器", "电视", "投影仪", "插座", "扫地机器人", "音响"};
+static const struct { const char *word; char value[8]; } modes[] = {
+    {"制冷", "cool"}, {"制热", "heat"}, {"自动", "auto"}, {"除湿", "dry"}, {"送风", "fan"},
+};
+
+static int starts_with(const char *text, const char *prefix) {
+    return !strncmp(text, prefix, strlen(prefix));
+}
+
+static int ends_with(const char *text, const char *suffix) {
+    size_t n = strlen(text), k = strlen(suffix);
+    return n >= k && !strcmp(text + n - k, suffix);
+}
+
+/* The STT can say 客厅的空调 while a cloud tool uses 客厅空调 for the same target. */
+static int normalize_device(char *name) {
+    for (size_t i = 0; i < sizeof(types) / sizeof(types[0]); ++i) {
+        if (!ends_with(name, types[i])) continue;
+        size_t prefix = strlen(name) - strlen(types[i]);
+        size_t particle = strlen("的");
+        if (prefix > particle && !memcmp(name + prefix - particle, "的", particle))
+            memmove(name + prefix - particle, name + prefix, strlen(types[i]) + 1);
+        return 1;
+    }
+    return 0;
+}
 
 static int send_result(xz_ws *ws, const char *session, const char *id,
                        const char *kind, const char *body) {
@@ -81,12 +111,20 @@ static int device_name(const char *text) {
 }
 
 static int decode_action(const xz_json_doc *doc, int arguments, char device[97],
-                         char action[24], char value_text[4]) {
+                         char action[24], char value_text[8]) {
     if (xz_json_get_string(doc, arguments, "device", device, 97) ||
         xz_json_get_string(doc, arguments, "action", action, 24) ||
         !device_name(device)) return -1;
+    (void)normalize_device(device);
     value_text[0] = '\0';
     if (!strcmp(action, "on") || !strcmp(action, "off")) return 0;
+    if (!strcmp(action, "mode")) {
+        if (!ends_with(device, "空调") || xz_json_get_string(doc, arguments, "mode", value_text, 8))
+            return -1;
+        for (size_t i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i)
+            if (!strcmp(value_text, modes[i].value)) return 0;
+        return -1;
+    }
     int value;
     if (xz_json_get_int(doc, arguments, "value", &value)) return -1;
     if ((!strcmp(action, "brightness") && value >= 1 && value <= 100) ||
@@ -191,17 +229,33 @@ static int action_result(xz_ws *ws, const char *session, const char *id, int acc
         : "{\"content\":[{\"type\":\"text\",\"text\":\"家庭服务受理未确认，请检查接入脚本和联网状态。\"}],\"isError\":true}");
 }
 
-static int starts_with(const char *text, const char *prefix) {
-    return !strncmp(text, prefix, strlen(prefix));
-}
-
-static int ends_with(const char *text, const char *suffix) {
-    size_t n = strlen(text), k = strlen(suffix);
-    return n >= k && !strcmp(text + n - k, suffix);
+static char *voice_mode(char *text, char value[8]) {
+    static const char *const verbs[] = {"调到", "调成", "调为", "切换到", "切换为", "切换成",
+                                        "设为", "设置为", "设置成", "改成", "开"};
+    if (starts_with(text, "把")) text += strlen("把");
+    if (starts_with(text, "如何") || starts_with(text, "怎么") || starts_with(text, "能不能")) return NULL;
+    for (size_t i = 0; i < sizeof(verbs) / sizeof(verbs[0]); ++i) {
+        char *split = strstr(text, verbs[i]);
+        if (!split) continue;
+        const char *setting = split + strlen(verbs[i]);
+        for (size_t j = 0; j < sizeof(modes) / sizeof(modes[0]); ++j) {
+            const char *word = modes[j].word;
+            if (!starts_with(setting, word)) continue;
+            const char *suffix = setting + strlen(word);
+            if (*suffix && strcmp(suffix, "模式")) continue;
+            size_t type_len = strlen("空调");
+            if ((size_t)(split - text) < type_len || memcmp(split - type_len, "空调", type_len))
+                return NULL;
+            *split = '\0';
+            strcpy(value, modes[j].value);
+            return text;
+        }
+    }
+    return NULL;
 }
 
 /* Some gateways answer a device utterance without calling MCP. Use the final
- * STT for single, explicit on/off requests, with no general command passthrough. */
+ * STT for explicit single-device switches and air conditioner mode changes. */
 int xz_home_mcp_voice(xz_home_mcp *state, xz_ws *ws, const char *text, uint64_t now) {
     if (!state->provider || state->pid || now < state->next_call) return 0;
     while (*text == ' ') ++text;
@@ -224,9 +278,11 @@ int xz_home_mcp_voice(xz_home_mcp *state, xz_ws *ws, const char *text, uint64_t 
         {"打开", "on"}, {"开启", "on"}, {"拉开", "on"}, {"关上", "off"},
         {"关闭", "off"}, {"关掉", "off"}, {"拉上", "off"},
     };
-    char *name = NULL;
-    char action[4] = "";
-    for (size_t i = 0; i < sizeof(verbs) / sizeof(verbs[0]); ++i) {
+    char value[8] = "";
+    char *name = voice_mode(utterance, value);
+    char action[5] = "";
+    if (name) strcpy(action, "mode");
+    for (size_t i = 0; !name && i < sizeof(verbs) / sizeof(verbs[0]); ++i) {
         const char *word = verbs[i].word;
         if (starts_with(utterance, word)) name = utterance + strlen(word);
         else if (starts_with(utterance, "把") && ends_with(utterance, word)) {
@@ -242,16 +298,9 @@ int xz_home_mcp_voice(xz_home_mcp *state, xz_ws *ws, const char *text, uint64_t 
     while (*name == ' ') ++name;
     n = strlen(name);
     while (n && name[n-1] == ' ') name[--n] = '\0';
-    if (n > 96 || !device_name(name)) return 0;
-    static const char *const types[] = {"窗帘", "灯", "风扇", "空调", "净化器", "加湿器", "电视",
-                                        "投影仪", "插座", "扫地机器人", "音响"};
-    for (size_t i = 0; i < sizeof(types) / sizeof(types[0]); ++i) {
-        if (!ends_with(name, types[i])) continue;
-        if (same_action(state, name, action, "", now)) return 0;
-        char value[] = "";
-        return start_request(state, ws->fd, action, name, value, "", now) ? -1 : 1;
-    }
-    return 0;
+    if (n > 96 || !device_name(name) || !normalize_device(name) ||
+        same_action(state, name, action, value, now)) return 0;
+    return start_request(state, ws->fd, action, name, value, "", now) ? -1 : 1;
 }
 
 int xz_home_mcp_request(xz_home_mcp *state, xz_ws *ws, const char *session,
@@ -278,7 +327,7 @@ int xz_home_mcp_request(xz_home_mcp *state, xz_ws *ws, const char *session,
     if (!strcmp(method, "ping")) return send_result(ws, session, id, "result", "{}");
     if (strcmp(method, "tools/call"))
         return send_result(ws, session, id, "error", "{\"code\":-32601,\"message\":\"Method not found\"}");
-    char name[48], device[97], action[24], value[4];
+    char name[48], device[97], action[24], value[8];
     if (xz_json_get_string(&doc, params, "name", name, sizeof(name)) || strcmp(name, HOME_TOOL) ||
         decode_action(&doc, xz_json_object_get(&doc, params, "arguments"), device, action, value))
         return send_result(ws, session, id, "error", "{\"code\":-32602,\"message\":\"无效的设备名或操作\"}");
@@ -288,6 +337,7 @@ int xz_home_mcp_request(xz_home_mcp *state, xz_ws *ws, const char *session,
             strcpy(state->id, id);
             return 0;
         }
+        if (!strcmp(state->id, id)) return 0;
     }
     if (closing || state->pid || now < state->next_call)
         return send_result(ws, session, id, "error", "{\"code\":-32000,\"message\":\"当前无法接收新的设备操作\"}");

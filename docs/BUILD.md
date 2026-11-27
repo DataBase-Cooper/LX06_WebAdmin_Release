@@ -10,7 +10,7 @@
 Set-Location kws/lx06-installer
 go test ./...
 go vet ./...
-go build -trimpath '-ldflags=-s -w -H=windowsgui -X main.version=V20261127.6-rc43 -X main.buildDate=2026-11-27' -o LX06Installer.exe .
+go build -trimpath '-ldflags=-s -w -H=windowsgui -X main.version=V20261127.7-rc44 -X main.buildDate=2026-11-27' -o LX06Installer.exe .
 go build -trimpath '-ldflags=-s -w -H=windowsgui' -o elevhelper.exe ./elevhelper
 ```
 
@@ -43,7 +43,7 @@ export OPUS_LIBRARY="$LX06_LIB/libopus.so.0.6.1"
 ```bash
 cd kws/lx06-installer
 python3 scripts/build_xz_pause_update.py \
-  scripts/examples/user-scripts/V20261127.6-rc43/xz_watch.sh \
+  scripts/examples/user-scripts/V20261127.7-rc44/xz_watch.sh \
   ../scratch/xz-client-rewrite/build/armhf/xz_client \
   build/repacked/xz_watch.sh
 ```
@@ -66,7 +66,7 @@ bash scripts/build_processed_mic.sh
 要构建云端复核工具 wake_cloud_asr，再为唤醒构建设置 OPUS_A 和 OPUS_INC，分别指向目标 ARM 静态 Opus 库和头文件。Web88 构建要求 ARM OpenSSL 1.0 前缀，其中 include/openssl 是同版头文件，lib 下包含从镜像提取的 libssl.so.1.0.0 和 libcrypto.so.1.0.0。
 
 ```bash
-LX06_TLS_PREFIX=/path/to/arm-openssl-1.0 LX06_FW_VERSION=V20261127.6-rc43 \
+LX06_TLS_PREFIX=/path/to/arm-openssl-1.0 LX06_FW_VERSION=V20261127.7-rc44 \
   bash scripts/build_webd_standalone.sh build/lx06webd
 bash scripts/build_model_adapter.sh build/model-adapter
 ```
@@ -80,7 +80,7 @@ bash scripts/build_model_adapter.sh build/model-adapter
 ```bash
 python3 scripts/online_upgrade_package.py build \
   --kernel /path/to/stock-boot.img --rootfs /path/to/root.squashfs \
-  --version V20261127.6-rc43-local --output build/local.lx06ota
+  --version V20261127.7-rc44-local --output build/local.lx06ota
 python3 scripts/online_upgrade_package.py verify build/local.lx06ota
 ```
 
@@ -92,7 +92,7 @@ Web88 通用条件比较由 hooks/webd/app-extension.h 解析，由 hooks/webd/i
 
 Windows 刷机组件和签名目录作为外部依赖，文件逐字节核对 driver_payload_windows.go 的哈希。CER 取自 WorldCup_Device.cat 的实际 PKCS#7 签名者。改变外部驱动或证书时需要重新审核完整签名链和目标系统。
 
-## rc43 脚本与 Web88 验证
+## rc44 脚本与 Web88 验证
 
 `kws/scratch/xz-client-rewrite/src/home_mcp.c` 实现小智 MCP 和已选接入脚本的调用。`runtime/model-adapter/mijia_mcp.sh` 使用音箱本机的原厂小爱服务。小智客户端更新后，重打包 `xz_watch.sh` 的 ARM 载荷。Web88 升级功能改动涉及 `hooks/webd/webd.c` 和 `hooks/webd/index.html`，编译增强镜像时同时替换两者。
 
