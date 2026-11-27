@@ -4,7 +4,9 @@
 #include <stddef.h>
 #include "session.h"
 
-int xz_protocol_build_hello(char *out, size_t capacity, int aec_enabled);
+int xz_protocol_build_hello(char *out, size_t capacity, int aec_enabled, int mcp_enabled);
+int xz_protocol_wrap_mcp(char *out, size_t capacity, const char *session_id,
+                         const char *payload);
 int xz_protocol_build_listen(char *out, size_t capacity, const char *session_id,
                              const char *state, const char *mode);
 int xz_protocol_build_abort(char *out, size_t capacity, const char *session_id,

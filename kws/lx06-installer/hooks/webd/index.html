@@ -225,6 +225,9 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .dialog-actions { display: grid; grid-template-columns: 1fr 1.25fr; gap: 9px; margin-top: 4px; }
 #upgradeModal .dialog-actions { grid-template-columns: 1fr 1fr; }
 #upgradeModal .dialog-button { height: 42px; }
+.upgrade-error-log { margin-top: 12px; color: #526f81; font-size: 12px; }
+.upgrade-error-log summary { cursor: pointer; }
+.upgrade-error-log textarea { display: block; width: 100%; margin-top: 6px; padding: 8px; resize: vertical; border: 1px solid #dce8ee; border-radius: 8px; background: #fbfdfe; color: var(--ink); font: 11px/1.5 monospace; }
 .dialog-button { height: 40px; border-radius: 10px; font-size: 12px; font-weight: 700; transition: transform .16s ease, border-color .18s ease, background .18s ease; }
 .dialog-button:active { transform: scale(.985); }
 .dialog-button:disabled { opacity: .6; cursor: wait; }
@@ -808,6 +811,10 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
           <button class="dialog-button" id="upgradeCheck" type="button">仅校验</button>
           <button class="dialog-button dialog-button-primary" id="upgradeVerify" type="button">上传并升级</button>
         </div>
+        <details class="upgrade-error-log" id="upgradeLog" hidden>
+          <summary>升级报错日志</summary>
+          <textarea id="upgradeLogText" rows="4" aria-label="升级报错日志，可选中复制" readonly spellcheck="false"></textarea>
+        </details>
       </section>
     </div>
     <div class="modal-backdrop" id="passwordModal" hidden>
@@ -3439,10 +3446,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   const button = el('upgradeVerify'), checkButton = el('upgradeCheck');
   const status = el('upgradeStatus'), progress = el('upgradeProgress');
   const slotInfo = el('upgradeSlotInfo'), wipeBox = el('upgradeWipe');
+  const errorLog = el('upgradeLog'), logText = el('upgradeLogText');
   let active = null;        /* 上传中的 XHR */
   let statusTimer = null;   /* 安装状态轮询（worker 生命周期内持续，可关弹窗） */
   let versionTimer = null;  /* 重启后新版本生效确认 */
   let lostTries = 0;
+  const hasAttempt = id => typeof id === 'string' && /^[0-9a-f]{32}$/.test(id);
   const hasBootId = id => typeof id === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id);
   function expectedBoot(version, slot, priorBoot) {
     if (typeof version !== 'string' || !version || version === 'unknown' ||
@@ -3460,6 +3469,27 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     committing: '正在提交分区切换…',
     rebooting: '正在重启…'
   };
+  /* Keep diagnostics across refresh in this tab, without writing speaker DATA. */
+  const logKey = 'lx06-upgrade-errors';
+  let errors = [];
+  try { errors = (sessionStorage.getItem(logKey) || '').split('\n').filter(Boolean).slice(-16); } catch (_) {}
+  function renderErrorLog() {
+    errorLog.hidden = !errors.length;
+    logText.value = errors.length ? '时间（UTC） | 阶段 | 错误码 | 目标版本 | 目标启动槽\n' + errors.join('\n') : '';
+  }
+  renderErrorLog();
+  function logUpgradeError(phase, code, version, slot, ts) {
+    const field = value => typeof value === 'string' && /^[0-9a-z._-]{1,64}$/i.test(value) ? value : '-';
+    const time = new Date(Number.isSafeInteger(ts) && ts > 0 && ts <= 253402300799 ? ts * 1000 : Date.now());
+    const line = [time.toISOString().slice(0, 19) + 'Z', field(phase), field(code), field(version), field(slot)].join(' | ');
+    if (errors.includes(line)) return;
+    errors = [...errors.slice(-15), line];
+    renderErrorLog();
+    try { sessionStorage.setItem(logKey, errors.join('\n')); } catch (_) {}
+  }
+  function logWorkerFailure(ota) {
+    logUpgradeError(ota.phase || 'install', ota.error || 'unknown_error', ota.version, ota.target, ota.ts);
+  }
   function loadSlotInfo() {
     fetch('/api/upgrade/status', { cache: 'no-store' })
       .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
@@ -3469,8 +3499,10 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         slotInfo.textContent = '当前版本 ' + d.run_version;
         if (ota.state === 'running' && !active && !statusTimer && !versionTimer)
           startStatusPolling(expectedBoot(ota.version, ota.target, d.boot_id));
-        else if (ota.state === 'failed' && !statusTimer && !status.textContent)
-          status.textContent = '上次升级失败：' + (uploadErrors.get(ota.error) || ota.error || '原因未知');
+        else if (ota.state === 'failed' && !active && !statusTimer && !versionTimer) {
+          logWorkerFailure(ota);
+          if (!status.textContent) status.textContent = '上次升级失败：' + (uploadErrors.get(ota.error) || ota.error || '原因未知');
+        }
       })
       .catch(() => {
         if (slotInfo.textContent === '正在读取当前系统状态…')
@@ -3480,37 +3512,63 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   function stopStatusPolling() {
     if (statusTimer) { clearInterval(statusTimer); statusTimer = null; }
   }
-  function startStatusPolling(expected) {
+  function pollUpgrade(url) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    return fetch(url, { cache: 'no-store', signal: controller.signal })
+      .then(r => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
+      .finally(() => clearTimeout(timeout));
+  }
+  function startStatusPolling(expected, recovery) {
     if (statusTimer) return;
     busy(true);
     lostTries = 0;
+    let ticks = 0, pending = false;
+    function confirmBoot() {
+      stopStatusPolling();
+      startVersionPolling(expected);
+    }
     const tick = () => {
-      fetch('/api/upgrade/status', { cache: 'no-store' })
-        .then(r => {
-          if (r.status === 401 && expected && statusTimer) {
-            stopStatusPolling();
-            startVersionPolling(expected);
-            return null;
-          }
-          if (!r.ok) throw new Error(String(r.status));
-          return r.json();
-        })
+      if (recovery && ++ticks > 200) {
+        stopStatusPolling();
+        busy(false);
+        logUpgradeError('status', 'upgrade_outcome_unknown', recovery.version, expected?.slot);
+        status.textContent = '仍未确认升级结果，请重新连接设备查看当前版本。';
+        return;
+      }
+      if (pending) return;
+      pending = true;
+      const timer = statusTimer;
+      pollUpgrade('/api/upgrade/status')
         .then(d => {
-          if (!d || !d.ok || !statusTimer) return;
+          if (statusTimer !== timer) return;
+          if (!d || !d.ok) throw new Error('invalid status');
           const ota = d.ota || {};
           const wasLost = lostTries > 0;
           lostTries = 0;
+          if (recovery) {
+            if (expected && hasBootId(d.boot_id) && d.boot_id !== expected.priorBoot) {
+              confirmBoot();
+              return;
+            }
+            if (!recovery.attempt || ota.attempt !== recovery.attempt || ota.version !== recovery.version) return;
+            expected = expected || expectedBoot(ota.version, ota.target, d.boot_id);
+          }
           if (ota.state === 'running') {
-            expected = expectedBoot(ota.version, ota.target, d.boot_id) || expected;
+            if (!recovery) expected = expectedBoot(ota.version, ota.target, d.boot_id) || expected;
             progress.hidden = true;
             status.textContent = (PHASE[ota.phase] || ota.phase || '处理中…') +
               (ota.version ? '（目标版本 ' + ota.version + '）' : '');
           } else if (ota.state === 'succeeded') {
-            stopStatusPolling();
-            startVersionPolling(expected || expectedBoot(ota.version, ota.target, d.boot_id));
+            expected = expected || expectedBoot(ota.version, ota.target, d.boot_id);
+            confirmBoot();
           } else if (ota.state === 'failed') {
             stopStatusPolling();
             busy(false);
+            logWorkerFailure(ota);
             status.textContent = uploadFailure(ota.error, '升级失败。');
           } else if (ota.state === 'idle') {
             stopStatusPolling();
@@ -3523,8 +3581,16 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
             }
           }
         })
-        .catch(() => {
-          if (!statusTimer) return;
+        .catch(error => {
+          if (statusTimer !== timer) return;
+          if (error.message === '401' && expected) {
+            confirmBoot();
+            return;
+          }
+          if (recovery) {
+            status.textContent = '连接中断，正在确认升级结果…';
+            return;
+          }
           lostTries++;
           if (lostTries === 40) {
             status.textContent = '等待设备恢复连接…';
@@ -3536,18 +3602,21 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
             /* 快 40 + 慢 90 ≈ 快 2 分钟 + 慢 7.5 分钟 ≈ 共 9.5 分钟仍不可达 */
             stopStatusPolling();
             busy(false);
+            logUpgradeError('status', 'device_unreachable', expected?.version, expected?.slot);
             status.textContent = '设备暂未恢复连接，请稍后刷新查看。';
           }
-        });
+        })
+        .finally(() => { pending = false; });
     };
-    tick();
     statusTimer = setInterval(tick, 3000);
+    tick();
   }
   function startVersionPolling(expected, note = '等待设备重启…') {
     if (versionTimer) return;
     progress.hidden = true;
     if (!expected) {
       busy(false);
+      logUpgradeError('boot', 'boot_identity_unavailable');
       status.textContent = '升级已受理，启动结果未确认。';
       return;
     }
@@ -3563,20 +3632,22 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     versionTimer = setInterval(() => {
       tries++;
       if (tries > 120) {
+        if (!observed) logUpgradeError('boot', 'boot_confirmation_timeout', expected.version, expected.slot);
         end(observed || '等待超时，升级结果未确认。');
         return;
       }
       if (busyRequest) return;
       busyRequest = true;
-      fetch('/api/version', { cache: 'no-store' })
-        .then(r => r.ok ? r.json() : null)
+      const timer = versionTimer;
+      pollUpgrade('/api/version')
         .then(d => {
-          if (!versionTimer || !d || !d.ok || !hasBootId(d.boot_id) || d.boot_id === expected.priorBoot) return;
+          if (versionTimer !== timer || !d || !d.ok || !hasBootId(d.boot_id) || d.boot_id === expected.priorBoot) return;
           if (d.source === 'image' && d.version === expected.version && d.running_slot === expected.slot) {
             end('升级完成，当前版本：' + d.version);
             loadSlotInfo();
             setTimeout(() => { if (!statusTimer && !versionTimer) close(); }, 2500);
           } else {
+            if (!observed) logUpgradeError('boot', 'boot_target_mismatch', expected.version, expected.slot);
             observed = '设备已重启，目标固件启动未确认。';
             status.textContent = observed;
           }
@@ -3638,7 +3709,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     ['receipt_invalid', '升级包校验已失效，请重新上传。'],
     ['receipt_unavailable', '无法完成升级校验，请稍后重试。'],
     ['upload_changed', '升级包内容已变化，请重新选择文件。'],
-    ['upload_cancelled', '升级包上传中断，请查看升级状态。'],
+    ['upload_cancelled', '连接已中断，设备未完成升级。'],
+    ['upload_unavailable', '设备暂时无法接收升级包，请稍后重试。'],
+    ['kernel_write_failed', '内核写入失败。'],
+    ['kernel_readback_mismatch', '内核写入后校验失败。'],
+    ['rootfs_write_failed', '系统镜像写入失败。'],
+    ['rootfs_readback_mismatch', '系统镜像写入后校验失败。'],
     ['source_slot_changed', '当前启动槽已改变，请刷新后重试。'],
     ['boot_identity_unavailable', '无法读取当前启动信息，升级未开始。'],
     ['slot_commit_unconfirmed', '启动槽写入结果未确认，请检查设备状态。']
@@ -3656,10 +3732,10 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const wipe = install && wipeBox.checked;
     sendUpload(file, install ? 'prepare' : 'check', wipe);
   }
-  function sendUpload(file, phase, wipe, receipt, verifiedVersion) {
+  function sendUpload(file, phase, wipe, verified) {
     const writing = phase === 'install';
     const preparing = phase === 'prepare';
-    const uploadLabel = writing ? '上传并写入' : '上传校验';
+    const uploadLabel = writing ? '上传固件' : '上传校验';
     const request = new XMLHttpRequest(); active = request; busy(true);
     progress.hidden = false; progress.value = 0;
     status.textContent = '正在' + uploadLabel + '…';
@@ -3667,12 +3743,25 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       if (active !== request) return;
       active = null; busy(false); progress.hidden = true; status.textContent = message;
     };
+    const interrupted = (code, message) => {
+      if (active !== request) return;
+      logUpgradeError(writing ? 'install' : 'verify', code, verified?.version);
+      if (!writing) { finish(message); return; }
+      active = null;
+      progress.hidden = true;
+      status.textContent = '安装应答未收到，正在确认升级结果…';
+      const target = verified.source === 'boot0' ? 'boot1' : verified.source === 'boot1' ? 'boot0' : '';
+      startStatusPolling(expectedBoot(verified.version, target, verified.source_boot_id), {
+        attempt: hasAttempt(verified.attempt) ? verified.attempt : '',
+        version: verified.version
+      });
+    };
     request.open('POST', writing ? '/api/upgrade/install' : '/api/upgrade/verify');
     request.timeout = 600000;
     request.setRequestHeader('Content-Type', 'application/octet-stream');
     request.setRequestHeader('X-LX06-Upgrade', writing ? 'install-v2' : preparing ? 'verify-v2' : 'verify-v1');
     if (writing) {
-      request.setRequestHeader('X-LX06-Receipt', receipt);
+      request.setRequestHeader('X-LX06-Receipt', verified.receipt);
       request.setRequestHeader('X-LX06-Wipe', wipe ? '1' : '0');
     }
     request.upload.onprogress = event => {
@@ -3684,38 +3773,44 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       if (active !== request || !writing) return;
       request.readingBack = true;
       progress.hidden = true;
-      status.textContent = '正在校验已写入的固件…';
+      status.textContent = '上传完成，设备正在处理固件…';
     };
     request.onload = () => {
       if (active !== request) return; // 已取消/已登出：迟到的响应不再影响界面
       let reply;
       try { reply = JSON.parse(request.responseText); }
-      catch (_) { finish('设备返回异常，升级结果未确认；请重新打开查看状态。'); return; }
+      catch (_) { interrupted('invalid_response', '设备返回异常，校验结果未确认。'); return; }
       /* 设备契约：响应必为 JSON 对象；非对象（null/数组/标量）= 协议异常 */
       if (typeof reply !== 'object' || reply === null || Array.isArray(reply)) {
-        finish('设备返回异常，升级结果未确认；请重新打开查看状态。'); return;
+        interrupted('invalid_response', '设备返回异常，校验结果未确认。'); return;
       }
       if (preparing && request.status === 200 && reply.ok && reply.verified) {
-        if (typeof reply.receipt !== 'string' || !/^[0-9a-f]{32}$/.test(reply.receipt) ||
+        if (!hasAttempt(reply.receipt) ||
             typeof reply.version !== 'string' || !reply.version) {
+          logUpgradeError('verify', 'receipt_unavailable', reply.version);
           finish(uploadErrors.get('receipt_unavailable'));
           return;
         }
-        sendUpload(file, 'install', wipe, reply.receipt, reply.version);
+        sendUpload(file, 'install', wipe, reply);
       } else if (!writing && !preparing && request.status === 200 && reply.ok && reply.verified) {
         finish('校验通过' + (reply.version ? ' · ' + reply.version : ''));
       } else if (writing && request.status === 200 && reply.ok && reply.install_accepted) {
+        const expected = reply.version === verified.version && expectedBoot(reply.version, reply.target, reply.source_boot_id);
+        if (!expected) { interrupted('invalid_install_ack'); return; }
         active = null;
-        const expected = reply.version === verifiedVersion && expectedBoot(reply.version, reply.target, reply.source_boot_id);
         startVersionPolling(expected, '升级已受理 · ' + reply.target +
           (reply.wipe === '1' ? '（清空用户数据）' : '（保留用户数据）'));
       } else {
         const error = typeof reply.error === 'string' && reply.error;
+        if (writing && (request.status < 400 || reply.ok !== false || !error ||
+            (request.status >= 500 && !uploadErrors.has(error)))) { interrupted('invalid_install_ack'); return; }
+        const code = /^[a-z][a-z0-9_]{0,63}$/.test(error || '') ? error : 'http_' + request.status;
+        logUpgradeError(writing ? 'install' : 'verify', code, verified?.version);
         finish(uploadErrors.get(error) || error || (writing ? '升级未完成。' : '校验失败。'));
       }
     };
-    request.onerror = () => finish('连接中断，请重新打开查看升级状态。');
-    request.ontimeout = () => finish('等待超时，请重新打开查看升级状态。');
+    request.onerror = () => interrupted('connection_lost', '上传校验时连接中断，请重新上传。');
+    request.ontimeout = () => interrupted('request_timeout', '上传校验超时，请重新上传。');
     request.onabort = () => finish('上传已取消。');
     request.send(file); // 浏览器流式上传 File：不做整包 ArrayBuffer/Base64 拷贝
   }

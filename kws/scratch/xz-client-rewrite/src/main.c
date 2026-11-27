@@ -10,6 +10,7 @@
 #include "aec.h"
 #include "input_gain.h"
 #include "event.h"
+#include "home_mcp.h"
 #include "identity.h"
 #include "json.h"
 #include "opus_codec.h"
@@ -522,7 +523,7 @@ static int handle_server_text(xz_ws *ws, xz_session *session, xz_timeline *timel
                               xz_player *player, int *player_ready, int *player_active,
                               int *playback_draining, uint64_t *playback_tail_until_ms,
                               const char *listen_mode, xz_goodbye_state *goodbye,
-                              uint64_t *last_activity) {
+                              uint64_t *last_activity, xz_home_mcp *home) {
     xz_server_event event;
     if (xz_event_parse_text((const char *)data, length, &event) != 0) {
         emit(timeline, "SERVER_JSON_ERROR", "bytes=%zu", length);
@@ -653,6 +654,11 @@ static int handle_server_text(xz_ws *ws, xz_session *session, xz_timeline *timel
             if(event.text[0] && !speaking) (void)lx06_dialog_light(LX06_LIGHT_THINKING);
             if (event.text[0]) *last_activity = now;
             if (event.text[0]) xz_talk_log(g_talk, "user", event.text);
+            if (!speaking && !goodbye->pending && !goodbye->sent_ms &&
+                (!g_listen_pause_ms || session->state == XZ_WAIT_RESPONSE)) {
+                int result = xz_home_mcp_voice(home, ws, event.text, now);
+                if (result) emit(timeline, result > 0 ? "HOME_MCP_VOICE_SUBMITTED" : "HOME_MCP_PROVIDER_UNAVAILABLE", "");
+            }
             if (g_keyword_mode && !g_listen_pause_ms && event.text[0]) {g_waiting=1;g_reply_serial++;}
             if (!g_keyword_mode && !goodbye->pending && goodbye->phrase && xz_text_matches_list(event.text, goodbye->phrase)) {
                 goodbye->pending = 1;
@@ -693,8 +699,13 @@ static int handle_server_text(xz_ws *ws, xz_session *session, xz_timeline *timel
                  event.text_bytes, event.emotion[0] ? event.emotion : "none");
             break;
         case XZ_EVENT_MCP:
-            emit(timeline, "MCP_UNSUPPORTED", "");
-            break;
+            if (!home->provider) {
+                emit(timeline, "MCP_UNSUPPORTED", "");
+                break;
+            }
+            emit(timeline, "HOME_MCP_MESSAGE", "");
+            return xz_home_mcp_request(home, ws, session->session_id, (const char *)data,
+                                       length, monotonic_ms(), goodbye->pending || goodbye->sent_ms);
         case XZ_EVENT_ABORT:
             g_interrupt_consumed=1;
             g_discard_reply_tail=1;
@@ -841,6 +852,10 @@ int main(void) {
 
     xz_ws ws;
     xz_session session;
+    xz_home_mcp home = {0};
+    if (env_enabled("XZ_HOME_MCP", 0))
+        xz_home_mcp_configure(&home, getenv("XZ_HOME_MCP_SCRIPT"));
+    emit(&timeline, "HOME_MCP_CONFIG", "provider_ready=%d", home.provider != NULL);
     unsigned char message[XZ_MESSAGE_CAP];
     size_t message_length = 0;
     int message_type = 0;
@@ -850,7 +865,7 @@ int main(void) {
     /* Local echo cancellation does not require the gateway's AEC extension.
      * Keep realtime's existing negotiation and leave keyword mode independent. */
     int server_aec_enabled = env_enabled("XZ_SERVER_AEC", g_phrase_uplink);
-    if (xz_protocol_build_hello(hello_json, sizeof(hello_json), server_aec_enabled) != 0) {
+    if (xz_protocol_build_hello(hello_json, sizeof(hello_json), server_aec_enabled, home.provider != NULL) != 0) {
         if (timeline_stream != stdout && timeline_stream != stderr) fclose(timeline_stream);
         return 4;
     }
@@ -1015,6 +1030,13 @@ int main(void) {
     int auxiliary_active = 0;
 
     while (!g_stop_requested && !finished) {
+        int home_pending = home.pid != 0;
+        if (xz_home_mcp_poll(&home, &ws, session.session_id, monotonic_ms()) < 0) {
+            exit_status = 11;
+            break;
+        }
+        if (home_pending && !home.pid)
+            emit(&timeline, "HOME_MCP_ACTION_RESULT", "accepted=%d", home.accepted);
         int rc = xz_ws_receive(&ws, &message_type, message, sizeof(message),
                                &message_length, 5);
         if (rc < 0) {
@@ -1033,7 +1055,7 @@ int main(void) {
                     sizeof(spoken_text), &echo_until_ms, &pending_barge,
                     barge_enabled, &barge_gate, &player, &player_ready, &player_active,
                     &playback_draining, &playback_tail_until_ms, g_listen_mode, &goodbye,
-                    &last_activity);
+                    &last_activity, &home);
                 if (event_result < 0) {
                     exit_status = 11;
                     break;
@@ -1401,6 +1423,7 @@ int main(void) {
         }
     }
 
+    xz_home_mcp_close(&home);
     if (!g_stop_requested && pending_playback_bytes && !tts_active && exit_status == 0) {
         finish_player(&player, &player_ready, &timeline,
                       (unsigned)env_long("XZ_PLAYBACK_DRAIN_MS", 5000, 100, 30000));

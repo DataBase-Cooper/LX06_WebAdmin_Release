@@ -10,7 +10,7 @@ LEGACY_LIB_DIR="${LEGACY_LIB_DIR:-$ROOT/build/arm-libs}"
 OPUS_LIBRARY="${OPUS_LIBRARY:-$LEGACY_LIB_DIR/libopus.so.0.6.1}"
 GCC_LIB_DIR="${GCC_LIB_DIR:-/usr/lib/gcc-cross/arm-linux-gnueabihf/12}"
 CRT_DIR="${CRT_DIR:-/usr/arm-linux-gnueabihf/lib}"
-BUILD_DIR="$ROOT/build/armhf"
+BUILD_DIR="${BUILD_DIR:-$ROOT/build/armhf}"
 OBJECT_DIR="$BUILD_DIR/obj"
 OUTPUT="$BUILD_DIR/xz_client"
 
@@ -32,7 +32,7 @@ rm -rf "$OBJECT_DIR"
 mkdir -p "$OBJECT_DIR"
 
 SOURCES=(
-    src/aec.c src/event.c src/identity.c src/json.c src/main.c src/opus_codec.c src/player.c
+    src/aec.c src/event.c src/home_mcp.c src/identity.c src/json.c src/main.c src/opus_codec.c src/player.c
     src/protocol.c src/session.c src/talk.c src/task_poll.c src/text_match.c src/timeline.c src/ws.c src/ws_frame.c
     ../../lx06-installer/runtime/common/control_asr.c
     ../../lx06-installer/hooks/webd/shim225.c

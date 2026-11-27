@@ -48,6 +48,32 @@ def xiaozhi_mcp_query_field():
 def xiaozhi_mcp_auto_field():
     return switch('XZ_MCP_TASK_AUTO', 'MCP 自动查询', 1)
 
+def xiaozhi_home_mcp_fields():
+    return [
+        switch('XZ_HOME_MCP', '智能家居控制', 0, advanced=False),
+        field('XZ_HOME_MCP_SCRIPT', '智能家居 MCP 脚本', 'none', 'select',
+              options=['none'], dynamic=True, maxBytes=80),
+    ]
+
+def xiaozhi_home_mcp_visibility(schema):
+    condition = dict(id='home-mcp-on', source='settings.XZ_HOME_MCP', equals='1')
+    visibility = dict(target='fields.XZ_HOME_MCP_SCRIPT', conditions=['home-mcp-on'])
+    for key, prop, item in (('conditions', 'id', condition), ('visibility', 'target', visibility)):
+        schema[key] = [old for old in schema.get(key, []) if old[prop] != item[prop]] + [item]
+
+def xiaozhi_home_mcp_catalog(text):
+    helper = (Path(__file__).resolve().parents[2] / 'scripts/xz_home_mcp_options.sh').read_text('utf8')
+    action = '    load) binding_web_load; exit $?;;'
+    replacement = '    load) home_mcp_options; binding_web_load; exit $?;;'
+    if helper.rstrip() in text and replacement in text:
+        return text
+    if text.count(action) != 1:
+        raise ValueError('Expected one Xiaozhi Web load action')
+    entry = 'if [ "${1:-}" = --web-action ]; then'
+    if text.count(entry) != 1:
+        raise ValueError('Expected one Xiaozhi Web action dispatcher')
+    return text.replace(entry, helper.rstrip() + '\n\n' + entry, 1).replace(action, replacement, 1)
+
 def xiaozhi_pause_visibility(schema):
     condition = dict(id='pause-enabled', source='settings.XZ_LISTEN_PAUSE_MS', notEquals='0')
     visibility = dict(target='fields.XZ_LISTEN_END_WORD', conditions=['pause-enabled'])
@@ -90,6 +116,7 @@ def schema(provider):
         fields += [
             xiaozhi_pause_field(),
             xiaozhi_end_word_field(),
+            *xiaozhi_home_mcp_fields(),
             field('XZ_INPUT_GAIN_DB','声音增益（0.00 dB 无增益）','0.00','number',
                   widget='slider',min=-12,max=12,step=.01,precision=2,center=0,unit='dB'),
             field('XZ_ACCESS_TOKEN', '连接令牌（留空保留原值）', type='password', maxBytes=512),
@@ -126,6 +153,7 @@ def schema(provider):
                  description='调低门槛可提高人声灵敏度。增强回声保护需要更持续的人声。')])
     else:
         xiaozhi_pause_visibility(result)
+        xiaozhi_home_mcp_visibility(result)
         result['flow'] = dict(initial='pair',steps=[
             step('pair','绑定小智',['XZ_ACCESS_TOKEN'],['save','bind'],watch='bind',interval=8,
                  description='在小智控制台添加设备，填写配对码。'),
@@ -195,7 +223,7 @@ def integrate(text, provider, candidate=False):
     text=re.sub(r'^# LX06-EXTENSION-BEGIN\n(?:#.*\n)*?# LX06-EXTENSION-END\n','',text,flags=re.M)
     text=re.sub(r'^# LX06-(?:SETTINGS: official_wake|SESSION-MANAGED: on)\n','',text,flags=re.M)
     if provider in ('xiaozhi', 'xz'):
-        text = upgrade_xiaozhi(text)
+        text = xiaozhi_home_mcp_catalog(upgrade_xiaozhi(text))
         fixed = f"export XZ_WS_URL='{XIAOZHI_URL}' XZ_BARGE_ANY=0"
         text = re.sub(r'(?m)^export XZ_(?:WS_URL=.* XZ_BARGE_ANY|BARGE_ANY)=0$', fixed, text, count=1)
         if fixed not in text:

@@ -12,7 +12,8 @@ from replace_script_payload import replace_payload
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'runtime/model-adapter'))
 from voice_settings import (
     xiaozhi_end_word_field, xiaozhi_keepalive_field, xiaozhi_mcp_auto_field, xiaozhi_mcp_query_field,
-    xiaozhi_pause_field, xiaozhi_pause_visibility,
+    xiaozhi_pause_field, xiaozhi_pause_visibility, xiaozhi_home_mcp_catalog,
+    xiaozhi_home_mcp_fields, xiaozhi_home_mcp_visibility,
 )
 
 
@@ -22,7 +23,7 @@ def build(source, client, output):
         raise ValueError('Expected an LX06 ARM client')
 
     text = source.read_text(encoding='utf-8')
-    pause_fields = [xiaozhi_pause_field(), xiaozhi_end_word_field()]
+    pause_fields = [xiaozhi_pause_field(), xiaozhi_end_word_field(), *xiaozhi_home_mcp_fields()]
     pause_names = [field['name'] for field in pause_fields]
     task_fields = [xiaozhi_keepalive_field(), xiaozhi_mcp_auto_field(), xiaozhi_mcp_query_field()]
     task_names = [field['name'] for field in task_fields]
@@ -36,6 +37,7 @@ def build(source, client, output):
         fields[position:position] = task_fields
         schema['fields'] = fields
         xiaozhi_pause_visibility(schema)
+        xiaozhi_home_mcp_visibility(schema)
         save, = [action for action in schema['actions'] if action['id'] == 'save']
         configure, = [step for step in schema['flow']['steps'] if step['id'] == 'configure']
         for container in (save, configure):
@@ -52,6 +54,7 @@ def build(source, client, output):
                           update, text)
     if count != 1:
         raise ValueError('Expected one Xiaozhi extension declaration')
+    text = xiaozhi_home_mcp_catalog(text)
     original = '    export LX06_DIALOG_LIGHTS=1 LX06_SESSION_MAX_SECONDS="${XZ_MAX_SESSION_SECONDS:-900}"\n'
     replacement = '''    limit=${XZ_MAX_SESSION_SECONDS:-900}
     keepalive=${XZ_KEEPALIVE_MINUTES:-0}

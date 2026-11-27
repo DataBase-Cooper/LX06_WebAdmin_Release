@@ -41,7 +41,8 @@ printf '\\123\\234' >> "$WORK/client.gz"
                 f.write(twice);f.flush();subprocess.run(['sh','-n',f.name],check=True)
             if provider=='xiaozhi':
                 self.assertEqual(twice.count('binding_web_event() ('),1)
-                self.assertIn('load) binding_web_load; exit $?;;',twice)
+                self.assertIn('load) home_mcp_options; binding_web_load; exit $?;;',twice)
+                self.assertEqual(twice.count('home_mcp_options() {'),1)
                 pair=schema['flow']['steps'][0]
                 self.assertEqual(pair['fields'],['XZ_ACCESS_TOKEN'])
                 self.assertIn('save',pair['actions'])

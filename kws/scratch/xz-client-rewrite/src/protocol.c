@@ -54,18 +54,27 @@ static int valid_state(const char *state) {
     return state && (strcmp(state, "start") == 0 || strcmp(state, "stop") == 0);
 }
 
-int xz_protocol_build_hello(char *out, size_t capacity, int aec_enabled) {
+int xz_protocol_build_hello(char *out, size_t capacity, int aec_enabled, int mcp_enabled) {
     if (!out || capacity == 0) return -1;
-    const char *hello = aec_enabled
-        ? "{\"type\":\"hello\",\"version\":1,\"transport\":\"websocket\","
-          "\"features\":{\"aec\":true},"
-          "\"audio_params\":{\"format\":\"opus\",\"sample_rate\":16000,\"channels\":1,\"frame_duration\":60}}"
-        : "{\"type\":\"hello\",\"version\":1,\"transport\":\"websocket\","
-          "\"audio_params\":{\"format\":\"opus\",\"sample_rate\":16000,\"channels\":1,\"frame_duration\":60}}";
-    size_t length = strlen(hello);
-    if (length >= capacity) return -1;
-    memcpy(out, hello, length + 1);
-    return 0;
+    const char *features = mcp_enabled
+        ? (aec_enabled ? "\"features\":{\"aec\":true,\"mcp\":true}," : "\"features\":{\"mcp\":true},")
+        : (aec_enabled ? "\"features\":{\"aec\":true}," : "");
+    int length = snprintf(out, capacity,
+        "{\"type\":\"hello\",\"version\":1,\"transport\":\"websocket\",%s"
+        "\"audio_params\":{\"format\":\"opus\",\"sample_rate\":16000,\"channels\":1,\"frame_duration\":60}}",
+        features);
+    return length >= 0 && (size_t)length < capacity ? 0 : -1;
+}
+
+int xz_protocol_wrap_mcp(char *out, size_t capacity, const char *session_id,
+                         const char *payload) {
+    if (!out || !capacity || !payload || !session_id) return -1;
+    size_t used = 0;
+    return append(out, capacity, &used, "{\"type\":\"mcp\",\"session_id\":") ||
+           append_string(out, capacity, &used, session_id) ||
+           append(out, capacity, &used, ",\"payload\":") ||
+           append(out, capacity, &used, payload) ||
+           append(out, capacity, &used, "}") ? -1 : 0;
 }
 
 int xz_protocol_build_listen(char *out, size_t capacity, const char *session_id,

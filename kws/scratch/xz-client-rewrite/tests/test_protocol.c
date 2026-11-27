@@ -1,18 +1,9 @@
 #include "../src/json.h"
-#include "../src/session.h"
+#include "../src/protocol.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-
-int xz_protocol_build_hello(char *out, size_t capacity, int aec_enabled);
-int xz_protocol_build_listen(char *out, size_t capacity, const char *session_id,
-                             const char *state, const char *mode);
-int xz_protocol_build_abort(char *out, size_t capacity, const char *session_id,
-                            const char *reason);
-int xz_protocol_build_goodbye(char *out, size_t capacity, const char *session_id);
-int xz_protocol_parse_server_hello(const char *json, size_t length, xz_hello *hello,
-                                   char *session_id, size_t session_id_capacity);
 
 static int json_bool(const xz_json_doc *doc, int object, const char *key, int *value) {
     int token = xz_json_object_get(doc, object, key);
@@ -38,7 +29,7 @@ static void assert_string(xz_json_doc *doc, int object, const char *key, const c
 
 static void test_feishu_v1_hello_uses_exact_audio_contract(void) {
     char json[512];
-    assert(xz_protocol_build_hello(json, sizeof(json), 0) == 0);
+    assert(xz_protocol_build_hello(json, sizeof(json), 0, 0) == 0);
     xz_json_doc doc;
     assert(xz_json_parse(&doc, json, strlen(json)) == 0);
     int number = 0;
@@ -58,7 +49,7 @@ static void test_feishu_v1_hello_uses_exact_audio_contract(void) {
 
 static void test_hello_advertises_aec_only_when_enabled(void) {
     char json[512];
-    assert(xz_protocol_build_hello(json, sizeof(json), 1) == 0);
+    assert(xz_protocol_build_hello(json, sizeof(json), 1, 0) == 0);
     xz_json_doc doc;
     assert(xz_json_parse(&doc, json, strlen(json)) == 0);
     int features = xz_json_object_get(&doc, doc.root, "features");

@@ -5815,7 +5815,8 @@ static int ota_http_reject(conn_t *c, int code, const char *reason, const char *
 }
 static void ota_http_install_commit(conn_t *c, const ota_manifest *m, int streamed);
 static void ota_receipt_feed(const conn_t *c, const void *bytes, size_t size);
-static const char *ota_receipt_remember(const conn_t *c, const ota_manifest *m);
+static const char *ota_receipt_remember(const conn_t *c, const ota_manifest *m,
+                                        char attempt[33]);
 
 /* tmpfs quota measures filesystem capacity. Keep 16 MiB of physical
  * headroom after the remaining bytes of a staged upload land. */
@@ -5885,15 +5886,18 @@ static void ota_http_data(conn_t *c, const void *bytes, size_t size) {
     return;
   }
   if (c->ota_prepare) {
-    const char *receipt = ota_receipt_remember(c, m);
+    char attempt[33], boot_id[37];
+    const char *receipt = ota_receipt_remember(c, m, attempt);
     if (!receipt) {
       ota_http_reject(c, 503, "Service Unavailable",
                       "{\"ok\":false,\"error\":\"receipt_unavailable\"}");
       return;
     }
+    ota_read_boot_id(boot_id);
     snprintf(result, sizeof(result),
-             "{\"ok\":true,\"verified\":true,\"version\":\"%s\",\"receipt\":\"%s\"}",
-             m->version, receipt);
+             "{\"ok\":true,\"verified\":true,\"version\":\"%s\",\"receipt\":\"%s\","
+             "\"attempt\":\"%s\",\"source\":\"%s\",\"source_boot_id\":\"%s\"}",
+             m->version, receipt, attempt, ota_running_slot(), boot_id);
     send_json(c->fd, result);
     conn_close(c);
     return;
@@ -6028,6 +6032,7 @@ struct ota_receipt {
   int64_t expires_ms;
   size_t length;
   char token[33];
+  char attempt[33];
   char session[128];
   unsigned char digests[(OTA_BODY_MAX + OTA_BLOCK_BYTES - 1) / OTA_BLOCK_BYTES][32];
 };
@@ -6051,17 +6056,23 @@ static void ota_receipt_feed(const conn_t *c, const void *bytes, size_t size) {
   }
 }
 
-static const char *ota_receipt_remember(const conn_t *c, const ota_manifest *m) {
+static const char *ota_receipt_remember(const conn_t *c, const ota_manifest *m,
+                                        char attempt[33]) {
   static const char hex[] = "0123456789abcdef";
-  unsigned char nonce[16];
+  unsigned char nonce[32];
   size_t i;
   if (sess_token_from_cookie(c->ota_cookie, ota_candidate.session, sizeof(ota_candidate.session)) ||
       rand_bytes(nonce, sizeof(nonce))) return NULL;
-  for (i = 0; i < sizeof(nonce); ++i) {
+  /* Status carries its own ID. It never exposes the upload receipt. */
+  for (i = 0; i < 16; ++i) {
     ota_candidate.token[2*i] = hex[nonce[i] >> 4];
     ota_candidate.token[2*i+1] = hex[nonce[i] & 15];
+    attempt[2*i] = hex[nonce[i+16] >> 4];
+    attempt[2*i+1] = hex[nonce[i+16] & 15];
   }
   ota_candidate.token[32] = 0;
+  attempt[32] = 0;
+  memcpy(ota_candidate.attempt, attempt, sizeof(ota_candidate.attempt));
   ota_candidate.manifest = *m;
   ota_candidate.length = c->ota_received;
   ota_candidate.expires_ms = lk_now_ms() + 120000;
@@ -6299,7 +6310,8 @@ static ota_mtd_part *ota_mtd_find(const ota_mtd_part *parts, int n, const char *
    error 为固定错误码 —— 均不含 JSON 元字符。 */
 static void ota_install_status(const char *state, const char *phase,
                                const char *version, const char *source,
-                               const char *target, int wipe, const char *error) {
+                               const char *target, int wipe, const char *error,
+                               const char *attempt) {
   char tmp[160], out[1100];
   int fd, off;
   long ts = (long)time(NULL);
@@ -6315,7 +6327,8 @@ static void ota_install_status(const char *state, const char *phase,
     off += snprintf(out + off, sizeof(out) - (size_t)off, "null");
   }
   if (off < 0 || (size_t)off >= sizeof(out)) return;
-  off += snprintf(out + off, sizeof(out) - (size_t)off, ",\"ts\":%ld}", ts);
+  off += snprintf(out + off, sizeof(out) - (size_t)off,
+                  ",\"ts\":%ld,\"attempt\":\"%s\"}", ts, attempt);
   if (off < 0 || (size_t)off >= sizeof(out)) return;
   fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
   if (fd >= 0) {
@@ -6601,6 +6614,7 @@ static void ota_install_worker(const struct ota_install_plan *plan) {
   int n, failed = 0, i, audio_stopped = 0;
   int upload_fd = plan->upload ? plan->upload->conn->fd : -1;
   int64_t deadline = plan->upload ? plan->upload->deadline : 0;
+  const char *attempt = plan->upload ? ota_verified.attempt : "";
 
 #define OTA_FAIL(why) do { \
     if (!failed) { failed = 1; snprintf(err, sizeof(err), "%s", (why)); } \
@@ -6623,7 +6637,7 @@ static void ota_install_worker(const struct ota_install_plan *plan) {
 
   fprintf(stderr, "[LX06OTA] worker start pkg=%s wipe=%d\n", plan->upload ? "stream" : plan->pkg, plan->wipe);
   ota_install_status("running", "preparing", plan->version,
-                     plan->source_slot, tname, plan->wipe, 0);
+                     plan->source_slot, tname, plan->wipe, 0, attempt);
   n = ota_mtd_scan(parts, 16);
   if (n <= 0) OTA_FAIL("mtd_layout_unavailable");
   if (ota_fw_env_get_retry("boot_part", cur, sizeof(cur)) != 0) {
@@ -6662,17 +6676,17 @@ static void ota_install_worker(const struct ota_install_plan *plan) {
   (void)system("echo 3 > /proc/sys/vm/drop_caches 2>/dev/null");
 
   phase = "writing_kernel";
-  ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0);
+  ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0, attempt);
   if (ota_mtd_stream_write(plan->pkg, OTA_KERNEL_OFF, plan->kernel_size, tboot->num, plan->upload) != 0)
     OTA_FAIL(plan->upload && plan->upload->error ? plan->upload->error : "kernel_write_failed");
   if (!plan->upload) {
     phase = "verifying_kernel";
-    ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0);
+    ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0, attempt);
     if (ota_mtd_stream_verify(plan->kernel_size, tname, plan->kernel_hash, 0) != 0)
       OTA_FAIL("kernel_readback_mismatch");
   }
   phase = "writing_rootfs";
-  ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0);
+  ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0, attempt);
   if (ota_mtd_stream_write(plan->pkg, OTA_KERNEL_OFF + plan->kernel_size,
                            plan->rootfs_size, tsys->num, plan->upload) != 0)
     OTA_FAIL(plan->upload && plan->upload->error ? plan->upload->error : "rootfs_write_failed");
@@ -6681,12 +6695,12 @@ static void ota_install_worker(const struct ota_install_plan *plan) {
     OTA_FAIL("upload_cancelled");
   if (plan->upload) {
     phase = "verifying_kernel";
-    ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0);
+    ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0, attempt);
     if (ota_mtd_stream_verify(plan->kernel_size, tname, plan->kernel_hash, deadline) != 0)
       OTA_FAIL("kernel_readback_mismatch");
   }
   phase = "verifying_rootfs";
-  ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0);
+  ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0, attempt);
   if (ota_mtd_stream_verify(plan->rootfs_size, tsname, plan->rootfs_hash, deadline) != 0)
     OTA_FAIL("rootfs_readback_mismatch");
   if (plan->upload) {
@@ -6722,7 +6736,7 @@ static void ota_install_worker(const struct ota_install_plan *plan) {
            NAND 级出厂清空。深度格式化失败不影响开机（退回文件级已清状态）。
        绝对路径：webd 的 PATH 不含 /usr/sbin。失败即中止安装（boot 槽未动）。 */
     phase = "wiping_data";
-    ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0);
+    ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0, attempt);
     if (system("find /data -mindepth 1 -maxdepth 1 -exec rm -rf {} \\; 2>/dev/null; sync") != 0)
       OTA_FAIL("data_wipe_failed");
     /* find -delete 对个别项失败仍可能返回 0 → 回验为空才是权威判据 */
@@ -6767,7 +6781,7 @@ static void ota_install_worker(const struct ota_install_plan *plan) {
     if (!plan->wipe && !ota_upload_connected(plan->upload)) OTA_FAIL("upload_cancelled");
   }
   phase = "committing";
-  ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0);
+  ota_install_status("running", phase, plan->version, plan->source_slot, tname, plan->wipe, 0, attempt);
   {
     /* R1b: 46MB 高压窗下 fw_env -s 亦可 EIO/fork-ENOMEM → 3 次重试
        (尝试间 drop_caches); 下方读回校验不变。仍失败=中止:
@@ -6786,7 +6800,7 @@ static void ota_install_worker(const struct ota_install_plan *plan) {
       OTA_FAIL("slot_commit_unconfirmed");
   }
   phase = "rebooting";
-  ota_install_status("succeeded", phase, plan->version, plan->source_slot, tname, plan->wipe, 0);
+  ota_install_status("succeeded", phase, plan->version, plan->source_slot, tname, plan->wipe, 0, attempt);
   if (plan->upload) {
     char response[320];
     snprintf(response, sizeof(response),
@@ -6804,9 +6818,10 @@ static void ota_install_worker(const struct ota_install_plan *plan) {
   _exit(1);
 
 ota_worker_done:
-  fprintf(stderr, "[LX06OTA] install failed phase=%s err=%s\n", phase, err);
+  fprintf(stderr, "[LX06OTA] install failed phase=%s version=%s target=%s err=%s\n",
+          phase, plan->version, tname, err);
   if (audio_stopped) ota_audio_start();
-  ota_install_status("failed", phase, plan->version, plan->source_slot, tname, plan->wipe, err);
+  ota_install_status("failed", phase, plan->version, plan->source_slot, tname, plan->wipe, err, attempt);
   if (plan->upload) {
     char response[96];
     int code = !strcmp(err, "session_expired") ? 401 :
@@ -6952,7 +6967,7 @@ static void ota_http_install_commit(conn_t *c, const ota_manifest *m, int stream
     upload.deadline = lk_now_ms() + 600000;
     plan.upload = &upload;
   } else {
-    ota_install_status("running", "queued", plan.version, cur, tname, c->ota_wipe, 0);
+    ota_install_status("running", "queued", plan.version, cur, tname, c->ota_wipe, 0, "");
   }
   {
     pid_t wp = fork();
@@ -7018,7 +7033,7 @@ static void h_upgrade_status(int fd) {
   char boot[32] = "", run_version[64] = "", boot_id[37];
   char raw[1200] = "";
   char state[16] = "", phase[24] = "", st_ver[64] = "", source[8] = "",
-       target[8] = "", st_err[48] = "", st_wipe[4] = "";
+       target[8] = "", st_err[48] = "", st_wipe[4] = "", attempt[33] = "";
   char ota_json[512], out[1024];
   long ts = 0;
   long data_free = -1;
@@ -7054,6 +7069,7 @@ static void h_upgrade_status(int fd) {
     ota_status_json_get(raw, "target", target, sizeof(target));
     ota_status_json_get(raw, "wipe", st_wipe, sizeof(st_wipe));
     ota_status_json_get(raw, "error", st_err, sizeof(st_err));
+    ota_status_json_get(raw, "attempt", attempt, sizeof(attempt));
     {
       char tsbuf[24] = "";
       ota_status_json_get(raw, "ts", tsbuf, sizeof(tsbuf));
@@ -7073,7 +7089,8 @@ static void h_upgrade_status(int fd) {
     off += snprintf(ota_json + off, sizeof(ota_json) - (size_t)off, "\"%s\"", st_err);
   else
     off += snprintf(ota_json + off, sizeof(ota_json) - (size_t)off, "null");
-  snprintf(ota_json + off, sizeof(ota_json) - (size_t)off, ",\"ts\":%ld}", ts);
+  snprintf(ota_json + off, sizeof(ota_json) - (size_t)off,
+           ",\"ts\":%ld,\"attempt\":\"%s\"}", ts, attempt);
   ota_read_boot_id(boot_id);
   snprintf(out, sizeof(out),
            "{\"ok\":true,\"boot\":\"%s\",\"run_version\":\"%s\","
