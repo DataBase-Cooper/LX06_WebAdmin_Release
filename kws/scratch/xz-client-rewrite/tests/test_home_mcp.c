@@ -39,6 +39,8 @@ static void await_reply(xz_home_mcp *state, xz_ws *ws, uint64_t now) {
     "\"arguments\":{\"device\":\"" device "\",\"action\":\"" action "\"}}}"
 #define MODE(id, device, mode) RPC(id, "tools/call") ",\"params\":{\"name\":\"self.smart_home.control\"," \
     "\"arguments\":{\"device\":\"" device "\",\"action\":\"mode\",\"mode\":\"" mode "\"}}}"
+#define LIGHT(id, device, action, field, value) RPC(id, "tools/call") ",\"params\":{\"name\":\"self.smart_home.control\"," \
+    "\"arguments\":{\"device\":\"" device "\",\"action\":\"" action "\",\"" field "\":\"" value "\"}}}"
 
 int main(void) {
     char tmp[] = "/tmp/lx06-home-mcp-test.XXXXXX";
@@ -49,7 +51,9 @@ int main(void) {
           "[ \"$1\" = --home-mcp-action ] || exit 2\n"
           "[ -z \"${XZ_HOME_MCP_SCRIPT:-}\" ] || exit 2\n"
           "case \"$3\" in\n"
-          "  客厅灯) printf '{\"code\":0}\\n';;\n"
+          "  客厅灯|客厅灯带|灯光)\n"
+          "    case \"$2\" in light_color|light_mode) printf '%s:%s\\n' \"$2\" \"$4\" >> light-count;; esac\n"
+          "    printf '{\"code\":0}\\n';;\n"
           "  次卧灯) printf '{\"code\":-1}\\n';;\n"
           "  书房灯) exec /bin/sleep 8;;\n"
           "  客厅窗帘) printf '%s\\n' \"$2\" >> curtain-count; printf '{\"code\":0}\\n';;\n"
@@ -72,6 +76,7 @@ int main(void) {
     assert(strstr(response, "2024-11-05"));
     call(&state, &ws, "test-turn", RPC("2", "tools/list") "}", 0, 0);
     assert(strstr(response, "self.smart_home.control") && !strstr(response, "mijia_mcp.sh"));
+    assert(strstr(response, "\"light_color\"") && strstr(response, "\"light_mode\""));
 
     call(&state, &ws, "wrong-turn", ACTION("3", "客厅灯", "on"), 1, 0);
     assert(!response[0] && !state.pid);
@@ -126,8 +131,31 @@ int main(void) {
     assert(fgets(count, sizeof(count), f) && !strcmp(count, "mode:cool\n"));
     assert(fgets(count, sizeof(count), f) && !strcmp(count, "mode:heat\n"));
     assert(!fgets(count, sizeof(count), f) && !fclose(f) && !unlink("ac-count"));
+    assert(!xz_home_mcp_voice(&state, &ws, "如何把客厅灯调到月光模式？", 26000));
+    assert(!xz_home_mcp_voice(&state, &ws, "把空调调到高亮模式。", 26001));
+    assert(xz_home_mcp_voice(&state, &ws, "把客厅的灯调成白色。", 26002) == 1);
+    call(&state, &ws, "test-turn", LIGHT("15", "客厅灯", "light_color", "color", "white"), 26003, 0);
+    await_reply(&state, &ws, 26004);
+    assert(strstr(response, "\"id\":15") && strstr(response, "\"isError\":false"));
+    assert(xz_home_mcp_voice(&state, &ws, "灯光调整成黄色。", 28000) == 1);
+    await_reply(&state, &ws, 28001);
+    assert(xz_home_mcp_voice(&state, &ws, "客厅灯带切换到月光模式。", 30000) == 1);
+    await_reply(&state, &ws, 30001);
+    call(&state, &ws, "test-turn", LIGHT("16", "客厅灯带", "light_mode", "mode", "moonlight"), 32000, 0);
+    assert(!state.pid && strstr(response, "\"isError\":false"));
+    call(&state, &ws, "test-turn", LIGHT("17", "客厅空调", "light_mode", "mode", "highlight"), 32001, 0);
+    assert(!state.pid && strstr(response, "-32602"));
+    call(&state, &ws, "test-turn", LIGHT("18", "客厅灯", "light_mode", "mode", "highlight"), 32002, 0);
+    await_reply(&state, &ws, 32003);
+    assert(strstr(response, "\"id\":18") && strstr(response, "\"isError\":false"));
+    f = fopen("light-count", "r");
+    assert(f && fgets(count, sizeof(count), f) && !strcmp(count, "light_color:white\n"));
+    assert(fgets(count, sizeof(count), f) && !strcmp(count, "light_color:yellow\n"));
+    assert(fgets(count, sizeof(count), f) && !strcmp(count, "light_mode:moonlight\n"));
+    assert(fgets(count, sizeof(count), f) && !strcmp(count, "light_mode:highlight\n"));
+    assert(!fgets(count, sizeof(count), f) && !fclose(f) && !unlink("light-count"));
     assert(!unlink("mijia_mcp.sh"));
-    call(&state, &ws, "test-turn", ACTION("15", "客厅灯", "on"), 26000, 0);
+    call(&state, &ws, "test-turn", ACTION("19", "客厅灯", "on"), 35000, 0);
     assert(!state.pid && strstr(response, "-32001"));
     assert(!unlink("link.sh") && !chdir("/") && !rmdir(tmp));
     return 0;

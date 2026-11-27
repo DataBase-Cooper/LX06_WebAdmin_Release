@@ -4,6 +4,8 @@
 #include "ws.h"
 #include <sys/types.h>
 
+#define XZ_HOME_VALUE_CAP 16
+
 typedef struct {
     const char *provider;
     pid_t pid;
@@ -13,7 +15,7 @@ typedef struct {
     size_t used;
     char reply[1024];
     char id[96];
-    char device[97], action[24], value[8];
+    char device[97], action[24], value[XZ_HOME_VALUE_CAP];
     uint64_t requested_at;
     int from_voice, accepted;
 } xz_home_mcp;
@@ -21,6 +23,7 @@ typedef struct {
 void xz_home_mcp_configure(xz_home_mcp *state, const char *provider);
 int xz_home_mcp_request(xz_home_mcp *state, xz_ws *ws, const char *session,
                      const char *message, size_t length, uint64_t now, int closing);
+/* 1 submits an action, 2 reuses a match, -1 fails submission, 0 is unrelated. */
 int xz_home_mcp_voice(xz_home_mcp *state, xz_ws *ws, const char *text, uint64_t now);
 int xz_home_mcp_poll(xz_home_mcp *state, xz_ws *ws, const char *session, uint64_t now);
 void xz_home_mcp_close(xz_home_mcp *state);

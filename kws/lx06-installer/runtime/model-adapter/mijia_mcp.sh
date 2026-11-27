@@ -23,6 +23,15 @@ case "$2" in
             *) exit 2;;
         esac
         command_text="把${3}调到${mode_text}模式";;
+    light_color|light_mode)
+        case "$3" in *灯|*灯光|*灯泡|*灯带) ;; *) exit 2;; esac
+        case "$2:$4" in
+            light_color:white) command_text="把${3}调成白色";;
+            light_color:yellow) command_text="把${3}调成黄色";;
+            light_mode:moonlight) command_text="把${3}切换到月光模式";;
+            light_mode:highlight) command_text="把${3}切换到高亮模式";;
+            *) exit 2;;
+        esac;;
     brightness|temperature)
         case "$4" in [1-9]|[1-9][0-9]|100) ;; *) exit 2;; esac
         if [ "$2" = brightness ]; then

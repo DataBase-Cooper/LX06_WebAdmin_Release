@@ -35,6 +35,7 @@ SOURCES=(
     src/aec.c src/event.c src/home_mcp.c src/identity.c src/json.c src/main.c src/opus_codec.c src/player.c
     src/protocol.c src/session.c src/talk.c src/task_poll.c src/text_match.c src/timeline.c src/ws.c src/ws_frame.c
     ../../lx06-installer/runtime/common/control_asr.c
+    ../../lx06-installer/runtime/doubao/src/echo.c
     ../../lx06-installer/hooks/webd/shim225.c
     ../../lx06-installer/hooks/robust/stat225_shim.c
 )

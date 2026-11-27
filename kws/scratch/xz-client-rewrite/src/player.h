@@ -20,6 +20,9 @@ typedef struct {
     int exit_code;
     int thread_started;
     unsigned period_ms;
+    unsigned sample_rate;
+    void (*observe_pcm)(void *, const unsigned char *, size_t, unsigned);
+    void *observe_context;
     pthread_t thread;
     pthread_mutex_t mutex;
     pthread_cond_t cond;

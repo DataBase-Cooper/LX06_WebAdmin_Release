@@ -84,12 +84,16 @@ class OpusCodec:
         self.lib.opus_decode.restype = ctypes.c_int
 
     def encode_constant(self, sample_rate, frame_size, value):
+        return self.encode_pcm(sample_rate, [value] * frame_size)
+
+    def encode_pcm(self, sample_rate, values):
+        frame_size = len(values)
         error = ctypes.c_int()
         encoder = self.lib.opus_encoder_create(sample_rate, 1, self.APPLICATION_VOIP,
                                                ctypes.byref(error))
         assert encoder and error.value == 0
         try:
-            pcm = (ctypes.c_int16 * frame_size)(*([value] * frame_size))
+            pcm = (ctypes.c_int16 * frame_size)(*values)
             packet = (ctypes.c_ubyte * 4000)()
             length = self.lib.opus_encode(encoder, pcm, frame_size, packet, len(packet))
             assert length > 0

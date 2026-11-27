@@ -10,6 +10,20 @@
 #include <unistd.h>
 static void path(char*out,const char*name){snprintf(out,256,"%s/%s",getenv("DC_LED_DIRECTORY"),name);}
 int main(int argc,char**argv){
+    if(argc==6&&!strcmp(argv[3],"call")&&!strcmp(argv[4],"led")&&!strcmp(argv[5],"status")) {
+        char file[256];path(file,"ledger");int fd=open(file,O_RDONLY|O_CLOEXEC);
+        struct led_fixture_record record;
+        if(fd<0||flock(fd,LOCK_SH)||read(fd,&record,sizeof(record))!=sizeof(record))return 3;
+        close(fd);
+        if(!record.bits) {puts("{\"info\":\"\"}");return 0;}
+        printf("{\"info\":\"{ \\\"effect\\\": [");
+        int separator=0;
+        for(unsigned type=0;type<16;type++) if(record.bits&(1u<<type)) {
+            printf("%s { \\\"type\\\": %u }",separator?",":"",type);separator=1;
+        }
+        puts(" ] }\"}");
+        return 0;
+    }
     if(argc!=7||strcmp(argv[3],"call")||strcmp(argv[4],"led"))return 2;
     int effect=-1;if(sscanf(argv[6],"{\"L\":%d}",&effect)!=1||effect<0||effect>15)return 2;
     int show=!strcmp(argv[5],"show");

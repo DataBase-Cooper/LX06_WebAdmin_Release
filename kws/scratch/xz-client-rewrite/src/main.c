@@ -11,6 +11,7 @@
 #include "input_gain.h"
 #include "event.h"
 #include "home_mcp.h"
+#include "../../../lx06-installer/runtime/doubao/src/echo.h"
 #include "identity.h"
 #include "json.h"
 #include "opus_codec.h"
@@ -54,6 +55,8 @@
 #define XZ_MANUAL_HOLD_FRAMES 36u
 #define XZ_KEEPALIVE_INTERVAL_MS 25000u
 #define XZ_TASK_QUIET_MS 3000u
+#define XZ_BARGE_HISTORY 36u /* 2.16 seconds of filtered PCM */
+#define XZ_BARGE_DEFAULT_RMS 1400u
 
 static volatile sig_atomic_t g_stop_requested;
 static const char *g_listen_mode = "auto";
@@ -75,7 +78,7 @@ static xz_manual_audio *g_manual_audio;
 static const char *g_interrupt_list = "";
 static const char *g_open_list = "";
 static int g_phrase_uplink = 0;
-static int g_keyword_mode, g_waiting, g_interrupt_consumed;
+static int g_keyword_mode, g_human_mode, g_waiting, g_interrupt_consumed;
 static uint64_t g_reply_serial=1;
 static int g_discard_reply_tail;
 
@@ -284,6 +287,18 @@ static int frame_speech_like(const int16_t *pcm, unsigned rms) {
     return rate >= 0.01 && rate <= 0.30;
 }
 
+typedef struct {
+    int16_t pcm[XZ_BARGE_HISTORY][XZ_MIC_SAMPLES];
+    unsigned next, used;
+    uint64_t last_voice, partial_since, guard_tail_until;
+    char partial[2048];
+} xz_human_barge;
+
+static void observe_playback(void *context, const unsigned char *pcm, size_t bytes,
+                             unsigned rate) {
+    db_echo_reference_rate(context, pcm, bytes, monotonic_ms(), rate);
+}
+
 static unsigned char pending_playback[XZ_PLAYER_QUEUE_CAPACITY];
 static size_t pending_playback_bytes;
 
@@ -295,7 +310,7 @@ static int queue_pending_playback(const void *pcm, size_t bytes) {
 }
 
 static int start_player(xz_player *player, int *ready, const char *program,
-                        const char *device, int sample_rate) {
+                        const char *device, int sample_rate, db_echo *echo) {
     if (!*ready) {
         if (xz_player_init(player) != 0) return -1;
         *ready = 1;
@@ -307,6 +322,8 @@ static int start_player(xz_player *player, int *ready, const char *program,
         }
     }
     if (player->thread_started) return 0;
+    player->observe_pcm = echo ? observe_playback : NULL;
+    player->observe_context = echo;
     return xz_player_start(player, program, device, sample_rate);
 }
 
@@ -408,6 +425,23 @@ static int stage_manual_audio(xz_ws *ws, const unsigned char *packet, size_t siz
     xz_held_packet *saved = &audio->packets[audio->next++ % XZ_MANUAL_HOLD_FRAMES];
     memcpy(saved->data, packet, size);
     saved->size = size;
+    return 0;
+}
+
+static int replay_barge_audio(xz_human_barge *barge, xz_ws *ws,
+                              xz_opus_codec *codec) {
+    while (barge->used) {
+        unsigned index = (barge->next + XZ_BARGE_HISTORY - barge->used) % XZ_BARGE_HISTORY;
+        const int16_t *pcm = barge->pcm[index];
+        unsigned char packet[XZ_OPUS_PACKET_CAP];
+        int bytes = xz_opus_encode(codec, pcm, XZ_MIC_SAMPLES, packet, sizeof(packet));
+        if (bytes <= 0 || stage_manual_audio(ws, packet, (size_t)bytes)) return -1;
+        if (g_listen_pause_ms && frame_speech_like(pcm, frame_rms(pcm))) {
+            if (g_manual_speech_frames < 2) ++g_manual_speech_frames;
+            g_manual_quiet_ms = 0;
+        }
+        --barge->used;
+    }
     return 0;
 }
 
@@ -549,7 +583,8 @@ static int handle_server_text(xz_ws *ws, xz_session *session, xz_timeline *timel
                 *pending_barge = 0;
                 spoken_text[0] = '\0';
                 xz_barge_gate_reset(barge_gate);
-                if (event.text[0]) append_spoken_text(spoken_text, spoken_cap, event.text);
+                if (event.text[0])
+                    append_spoken_text(spoken_text, spoken_cap, event.text);
                 emit(timeline, "TTS_START", "text_bytes=%zu", event.text_bytes);
             } else if (strcmp(event.state, "sentence_start") == 0) {
                 append_spoken_text(spoken_text, spoken_cap, event.text);
@@ -600,6 +635,7 @@ static int handle_server_text(xz_ws *ws, xz_session *session, xz_timeline *timel
             uint64_t now = monotonic_ms();
             int speaking = *tts_active || *playback_draining ||
                            (player_active && *player_active);
+            if (g_human_mode && speaking) break;
             /* 自己刚说的话里含开启/结束/打断词：回声命中不算用户。
              * 对照 outbound 文本，不看音量。豆包端到端复用 xz_self_echo。 */
             if (event.text[0] && spoken_text[0] &&
@@ -613,7 +649,7 @@ static int handle_server_text(xz_ws *ws, xz_session *session, xz_timeline *timel
             /* Realtime cloud VAD may stop TTS before final ASR arrives. A
              * configured control phrase still cancels the pending reply and
              * keeps this conversation open, including while already listening. */
-            if (!g_keyword_mode && xz_text_matches_list(event.text, g_interrupt_list) &&
+            if (!g_keyword_mode && !g_human_mode && xz_text_matches_list(event.text, g_interrupt_list) &&
                 !xz_text_matches_list(event.text, goodbye->phrase)) {
                 if(g_interrupt_consumed) {
                     emit(timeline,"REPEATED_INTERRUPT_IGNORED","listening_unchanged");break;
@@ -657,9 +693,13 @@ static int handle_server_text(xz_ws *ws, xz_session *session, xz_timeline *timel
             if (!speaking && !goodbye->pending && !goodbye->sent_ms &&
                 (!g_listen_pause_ms || session->state == XZ_WAIT_RESPONSE)) {
                 int result = xz_home_mcp_voice(home, ws, event.text, now);
-                if (result) emit(timeline, result > 0 ? "HOME_MCP_VOICE_SUBMITTED" : "HOME_MCP_PROVIDER_UNAVAILABLE", "");
+                if (result) {
+                    const char *event_name = result == 2 ? "HOME_MCP_VOICE_REUSED" :
+                        result == 1 ? "HOME_MCP_VOICE_SUBMITTED" : "HOME_MCP_PROVIDER_UNAVAILABLE";
+                    emit(timeline, event_name, "");
+                }
             }
-            if (g_keyword_mode && !g_listen_pause_ms && event.text[0]) {g_waiting=1;g_reply_serial++;}
+            if ((g_keyword_mode || g_human_mode) && !g_listen_pause_ms && event.text[0]) {g_waiting=1;g_reply_serial++;}
             if (!g_keyword_mode && !goodbye->pending && goodbye->phrase && xz_text_matches_list(event.text, goodbye->phrase)) {
                 goodbye->pending = 1;
                 goodbye->seen_ms = now;
@@ -707,6 +747,8 @@ static int handle_server_text(xz_ws *ws, xz_session *session, xz_timeline *timel
             return xz_home_mcp_request(home, ws, session->session_id, (const char *)data,
                                        length, monotonic_ms(), goodbye->pending || goodbye->sent_ms);
         case XZ_EVENT_ABORT:
+            if (g_human_mode && (g_discard_reply_tail ||
+                !strcmp(event.reason, "speech_detected"))) break;
             g_interrupt_consumed=1;
             g_discard_reply_tail=1;
             if (*tts_active || *player_active || *playback_draining || pending_playback_bytes) {
@@ -808,11 +850,12 @@ int main(void) {
             emit(&timeline,"CONFIG_ERROR","XZ_BARGE_ANY_must_be_0_or_1");return 2;
         }
         g_keyword_mode=!strcmp(barge_mode,"0");
-        g_phrase_uplink=!g_keyword_mode;
-        full_duplex=!g_keyword_mode;
-        barge_enabled=0; /* Native cloud speech mode uses stock processed AEC. */
-        g_listen_mode=g_keyword_mode?"auto":"realtime";
-        emit(&timeline,"INTERRUPTION_MODE","XZ_BARGE_ANY=%s provider=%s",barge_mode,g_keyword_mode?"speaker_xiaomi_asr":"native_realtime");
+        g_human_mode=!g_keyword_mode;
+        g_phrase_uplink=0;
+        full_duplex=0;
+        barge_enabled=0;
+        g_listen_mode="auto";
+        emit(&timeline,"INTERRUPTION_MODE","XZ_BARGE_ANY=%s provider=speaker_xiaomi_asr",barge_mode);
     }
     g_listen_pause_ms = (unsigned)env_long("XZ_LISTEN_PAUSE_MS", 0, 0, 8000);
     if (g_listen_pause_ms >= 1000) {
@@ -1016,12 +1059,27 @@ int main(void) {
     int exit_status = 0;
     int finished = 0;
     lx06_control_asr *control_asr=NULL;
-    if(g_keyword_mode || *g_manual_end_word) {
+    if(g_keyword_mode || (g_human_mode && playback_enabled) || *g_manual_end_word) {
         control_asr=lx06_control_asr_open(env_or("LX06_CONTROL_ASR_SOCKET",""));
         if(!control_asr && g_keyword_mode){emit(&timeline,"CONTROL_ASR_UNAVAILABLE","protected_mode_requires_bridge");finished=1;exit_status=16;}
-        if(!control_asr && !g_keyword_mode)emit(&timeline,"MANUAL_END_WORD_UNAVAILABLE","fallback=silence");
+        if(!control_asr && *g_manual_end_word)emit(&timeline,"MANUAL_END_WORD_UNAVAILABLE","fallback=silence");
         if(g_keyword_mode)g_waiting=*wake_text!=0;
     }
+    db_echo human_echo = {0};
+    xz_human_barge *human_barge = NULL;
+    if (g_human_mode && playback_enabled) {
+        human_echo.speech_rms = (unsigned)env_long("XZ_BARGE_RMS", XZ_BARGE_DEFAULT_RMS,
+                                                  DB_BARGE_MIN_RMS, DB_BARGE_MAX_RMS);
+        human_echo.require_reference = 1;
+        if (control_asr && (human_barge = calloc(1, sizeof(*human_barge))) &&
+            pthread_mutex_init(&human_echo.lock, NULL) != 0) {
+            free(human_barge);
+            human_barge = NULL;
+        }
+        if (human_barge) emit(&timeline, "HUMAN_BARGE_READY", "rms=%u", human_echo.speech_rms);
+        else emit(&timeline, "HUMAN_BARGE_UNAVAILABLE", "fallback=protected_half_duplex");
+    }
+    db_echo *playback_echo = human_barge ? &human_echo : NULL;
     if (control_asr && *g_manual_end_word) {
         g_manual_audio = calloc(1, sizeof(*g_manual_audio));
         if (g_manual_audio) g_manual_audio->cue_at = UINT64_MAX;
@@ -1035,8 +1093,9 @@ int main(void) {
             exit_status = 11;
             break;
         }
-        if (home_pending && !home.pid)
+        if (home_pending && !home.pid) {
             emit(&timeline, "HOME_MCP_ACTION_RESULT", "accepted=%d", home.accepted);
+        }
         int rc = xz_ws_receive(&ws, &message_type, message, sizeof(message),
                                &message_length, 5);
         if (rc < 0) {
@@ -1061,8 +1120,7 @@ int main(void) {
                     break;
                 }
                 if (event_result > 0) finished = 1;
-            } else if (message_type == XZ_WS_BINARY) {
-                if(g_discard_reply_tail)continue;
+            } else if (message_type == XZ_WS_BINARY && !g_discard_reply_tail) {
                 int samples = xz_opus_decode(&codec, message, message_length,
                                              decoded_pcm, XZ_MAX_SERVER_SAMPLES);
                 if (samples <= 0) {
@@ -1077,7 +1135,7 @@ int main(void) {
                             emit(&timeline, "PLAYBACK_PENDING_OVERFLOW", ""); exit_status=15; break;
                         }
                     } else if (start_player(&player, &player_ready, aplay, alsa_device,
-                                     output_rate) != 0) {
+                                     output_rate, playback_echo) != 0) {
                         emit(&timeline, "PLAYBACK_START_ERROR", "");
                     } else {
                         player_active = 1;
@@ -1111,7 +1169,14 @@ int main(void) {
         uint64_t manual_tag = g_manual_audio && g_manual_turn && !audible && !g_waiting &&
                               !goodbye.sent_ms && now >= playback_tail_until_ms ?
                               XZ_MANUAL_TURN_TAG | g_manual_turn : 0;
-        int want_auxiliary = g_keyword_mode || manual_tag != 0;
+        int human_observe = control_asr && human_barge && player_active &&
+                            !goodbye.pending && !goodbye.sent_ms;
+        if (human_barge && !human_observe) {
+            human_barge->used = 0;
+            human_barge->last_voice = 0;
+            human_barge->partial_since = 0;
+        }
+        int want_auxiliary = g_keyword_mode || manual_tag != 0 || human_observe;
         if (control_asr && (want_auxiliary || auxiliary_active)) {
             char control[2048];
             lx06_control_asr_reply(control_asr, manual_tag ? manual_tag : (audible||g_waiting)?g_reply_serial:0);
@@ -1130,7 +1195,9 @@ int main(void) {
             if (got < 0) {
                 lx06_control_asr_close(control_asr);
                 control_asr = NULL;
-                emit(&timeline, "MANUAL_END_WORD_UNAVAILABLE", "fallback=silence");
+                human_observe = 0;
+                if (human_barge) emit(&timeline, "HUMAN_BARGE_UNAVAILABLE", "fallback=protected_half_duplex");
+                if (*g_manual_end_word) emit(&timeline, "MANUAL_END_WORD_UNAVAILABLE", "fallback=silence");
                 if (g_manual_audio && send_held_audio(&ws, g_manual_audio->next)) {exit_status=12;break;}
                 free(g_manual_audio);
                 g_manual_audio = NULL;
@@ -1142,6 +1209,53 @@ int main(void) {
                     send_manual_stop(&ws, &timeline, session.session_id, 1)) {
                     exit_status = 12;
                     break;
+                }
+            } else if (human_observe && human_barge->last_voice) {
+                uint64_t reply = lx06_control_asr_result_reply(control_asr);
+                const char *text = control;
+                if (!got) text = lx06_control_asr_partial(control_asr, &reply);
+                int independent = reply == g_reply_serial && *spoken_text &&
+                    now - human_barge->last_voice <= 700 && xz_text_has_speech(text, got ? 2 : 4) &&
+                    !xz_text_is_echo(text, spoken_text) && !xz_text_matches_phrase(spoken_text, text);
+                if (!independent) human_barge->partial_since = 0;
+                else if (!got && (!human_barge->partial_since || strcmp(human_barge->partial, text))) {
+                    snprintf(human_barge->partial, sizeof(human_barge->partial), "%s", text);
+                    human_barge->partial_since = now;
+                } else if (got || now - human_barge->partial_since >= 75) {
+                    int cancel_remote = tts_active;
+                    abort_player(&player, &player_ready);
+                    player_active = tts_active = playback_draining = g_waiting = 0;
+                    playback_tail_until_ms = 0;
+                    human_barge->guard_tail_until = monotonic_ms() + 460;
+                    g_discard_reply_tail = 1;
+                    if (session.state == XZ_SPEAKING) (void)xz_session_abort(&session);
+                    else if (session.state == XZ_WAIT_RESPONSE) session.state = XZ_LISTENING;
+                    pending_barge = 0;
+                    xz_barge_gate_reset(&barge_gate);
+                    last_activity = now;
+                    (void)lx06_dialog_light(LX06_LIGHT_INTERRUPTED);
+                    emit(&timeline, "HUMAN_BARGE", "source=%s buffered_ms=%u",
+                         got ? "asr_final" : "asr_partial", human_barge->used * XZ_FRAME_MS);
+                    if (xz_text_matches_list(text, goodbye_text)) {
+                        finished = 1;
+                        if (send_goodbye(&ws, &session, &timeline, &goodbye)) exit_status = 16;
+                        break;
+                    }
+                    char abort[256];
+                    if ((cancel_remote && (xz_protocol_build_abort(abort, sizeof(abort), session.session_id,
+                                                                 "wake_word_detected") ||
+                                           send_text(&ws, &timeline, "ABORT_SENT", abort))) ||
+                        send_listen_start(&ws, &timeline, session.session_id) ||
+                        replay_barge_audio(human_barge, &ws, &codec)) {
+                        exit_status = 16;
+                        break;
+                    }
+                    if (lx06_control_asr_feed(control_asr, 0, NULL, 0, now) < 0) {
+                        lx06_control_asr_close(control_asr);
+                        control_asr = NULL;
+                    }
+                    auxiliary_active = 0;
+                    human_observe = audible = 0;
                 }
             } else if (got > 0 && g_keyword_mode) {
                 emit(&timeline,"CONTROL_ASR_FINAL","text=%s",control);
@@ -1185,7 +1299,8 @@ int main(void) {
                     memcpy(processed_pcm, mic_pcm, sizeof(processed_pcm));
                     double echo_correlation = 1.0;
                     unsigned rms = 0;
-                    if (local_aec_enabled && (tts_active || player_active || playback_draining)) {
+                    if (local_aec_enabled && !g_human_mode &&
+                        (tts_active || player_active || playback_draining)) {
                         reference_frame(&reference_ring, capture_start_ms,
                                         aec_output_delay_ms, reference_pcm);
                         if (xz_aec_process(&aec, reference_pcm, mic_pcm,
@@ -1193,6 +1308,22 @@ int main(void) {
                             emit(&timeline, "AEC_PROCESS_ERROR", "");
                         }
                         echo_correlation = aec.last_correlation;
+                    }
+                    if (human_barge) {
+                        /* Never feed speaker-dominated frames to either recognizer.
+                         * The short lead buffer preserves the beginning of speech. */
+                        int protect = human_observe || capture_end_ms < human_barge->guard_tail_until;
+                        for (size_t offset = 0; offset < sizeof(processed_pcm); offset += DB_ECHO_FRAME_BYTES)
+                            db_echo_filter(&human_echo, mic_pending + offset, protect, capture_end_ms,
+                                           (unsigned char *)processed_pcm + offset);
+                        if (human_observe) {
+                            if (frame_speech_like(processed_pcm, frame_rms(processed_pcm)))
+                                human_barge->last_voice = capture_end_ms;
+                            memcpy(human_barge->pcm[human_barge->next], processed_pcm, sizeof(processed_pcm));
+                            human_barge->next = (human_barge->next + 1) % XZ_BARGE_HISTORY;
+                            unsigned capacity = human_barge->last_voice ? XZ_BARGE_HISTORY : 2;
+                            if (human_barge->used < capacity) ++human_barge->used;
+                        }
                     }
                     rms = frame_rms(processed_pcm);
                     int speech_like = frame_speech_like(processed_pcm, rms);
@@ -1204,7 +1335,7 @@ int main(void) {
                              rms, echo_correlation, speech_like);
                     }
                     const int16_t *uplink_pcm = processed_pcm;
-                    int protected_audio=g_keyword_mode && (tts_active||player_active||playback_draining||pending_playback_bytes||g_waiting);
+                    int protected_audio=(g_keyword_mode || g_human_mode) && (audible || g_waiting);
                     /* Native realtime also uploads microphone frames while
                      * listening. After the actual player exits, replace tail
                      * frames with silence for BOTH recognizers. Use the frame
@@ -1251,7 +1382,8 @@ int main(void) {
                         if (g_keyword_mode) {exit_status=16;break;}
                         lx06_control_asr_close(control_asr);
                         control_asr = NULL;
-                        emit(&timeline, "MANUAL_END_WORD_UNAVAILABLE", "fallback=silence");
+                        if (human_barge) emit(&timeline, "HUMAN_BARGE_UNAVAILABLE", "fallback=protected_half_duplex");
+                        if (*g_manual_end_word) emit(&timeline, "MANUAL_END_WORD_UNAVAILABLE", "fallback=silence");
                         if (g_manual_audio && send_held_audio(&ws, g_manual_audio->next)) {exit_status=12;break;}
                         free(g_manual_audio);
                         g_manual_audio = NULL;
@@ -1381,7 +1513,7 @@ int main(void) {
             }
         }
         if (pending_playback_bytes && !player_active) {
-            if (start_player(&player, &player_ready, aplay, alsa_device, output_rate) != 0 ||
+            if (start_player(&player, &player_ready, aplay, alsa_device, output_rate, playback_echo) != 0 ||
                 xz_player_write(&player, pending_playback, pending_playback_bytes) != 0) {
                 emit(&timeline, "PLAYBACK_PENDING_ERROR", ""); exit_status=15; break;
             }
@@ -1427,7 +1559,8 @@ int main(void) {
     if (!g_stop_requested && pending_playback_bytes && !tts_active && exit_status == 0) {
         finish_player(&player, &player_ready, &timeline,
                       (unsigned)env_long("XZ_PLAYBACK_DRAIN_MS", 5000, 100, 30000));
-        if (pending_playback_bytes && start_player(&player, &player_ready, aplay, alsa_device, output_rate)==0 &&
+        if (pending_playback_bytes &&
+            start_player(&player, &player_ready, aplay, alsa_device, output_rate, playback_echo)==0 &&
             xz_player_write(&player, pending_playback, pending_playback_bytes)==0) {
             pending_playback_bytes=0;
             player_active=1;
@@ -1437,6 +1570,10 @@ int main(void) {
         finish_player(&player, &player_ready, &timeline,
                       (unsigned)env_long("XZ_PLAYBACK_DRAIN_MS", 5000, 100, 30000));
     else if (player_ready) abort_player(&player, &player_ready);
+    if (human_barge) {
+        pthread_mutex_destroy(&human_echo.lock);
+        free(human_barge);
+    }
     xz_task_session_close(task_session_dir);
     (void)lx06_dialog_light(LX06_LIGHT_END);
     emit(&timeline, "SESSION_SUMMARY", "mic_frames=%llu tts_frames=%llu status=%d",

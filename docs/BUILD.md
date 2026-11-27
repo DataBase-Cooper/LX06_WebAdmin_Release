@@ -10,7 +10,7 @@
 Set-Location kws/lx06-installer
 go test ./...
 go vet ./...
-go build -trimpath '-ldflags=-s -w -H=windowsgui -X main.version=V20261127.7-rc44 -X main.buildDate=2026-11-27' -o LX06Installer.exe .
+go build -trimpath '-ldflags=-s -w -H=windowsgui -X main.version=V20261127.8-rc45 -X main.buildDate=2026-11-27' -o LX06Installer.exe .
 go build -trimpath '-ldflags=-s -w -H=windowsgui' -o elevhelper.exe ./elevhelper
 ```
 
@@ -43,7 +43,7 @@ export OPUS_LIBRARY="$LX06_LIB/libopus.so.0.6.1"
 ```bash
 cd kws/lx06-installer
 python3 scripts/build_xz_pause_update.py \
-  scripts/examples/user-scripts/V20261127.7-rc44/xz_watch.sh \
+  scripts/examples/user-scripts/V20261127.8-rc45/xz_watch.sh \
   ../scratch/xz-client-rewrite/build/armhf/xz_client \
   build/repacked/xz_watch.sh
 ```
@@ -66,12 +66,16 @@ bash scripts/build_processed_mic.sh
 要构建云端复核工具 wake_cloud_asr，再为唤醒构建设置 OPUS_A 和 OPUS_INC，分别指向目标 ARM 静态 Opus 库和头文件。Web88 构建要求 ARM OpenSSL 1.0 前缀，其中 include/openssl 是同版头文件，lib 下包含从镜像提取的 libssl.so.1.0.0 和 libcrypto.so.1.0.0。
 
 ```bash
-LX06_TLS_PREFIX=/path/to/arm-openssl-1.0 LX06_FW_VERSION=V20261127.7-rc44 \
+LX06_TLS_PREFIX=/path/to/arm-openssl-1.0 LX06_FW_VERSION=V20261127.8-rc45 \
   bash scripts/build_webd_standalone.sh build/lx06webd
 bash scripts/build_model_adapter.sh build/model-adapter
 ```
 
 用 arm-linux-gnueabihf-readelf -hV FILE 检查 ARM 与依赖符号。动态加载验证使用同一版固件的目标库。不同工具链或固件基底会改变重编产物的哈希。
+
+## 共用对话灯效
+
+构建时使用 `scripts/build_processed_mic.sh` 生成的 `session-run`。同一次构建使用 `scripts/patch_stock_led.py` 处理镜像内的 `bin/show_led`，保留原厂 `bin/shut_led` 符号链接。两者共享会话灯效锁，需同时更新。接口和回归场景见 [对话灯光](../kws/lx06-installer/docs/dialog-light-api.md)。
 
 ## SquashFS 与在线升级包
 
@@ -80,7 +84,7 @@ bash scripts/build_model_adapter.sh build/model-adapter
 ```bash
 python3 scripts/online_upgrade_package.py build \
   --kernel /path/to/stock-boot.img --rootfs /path/to/root.squashfs \
-  --version V20261127.7-rc44-local --output build/local.lx06ota
+  --version V20261127.8-rc45-local --output build/local.lx06ota
 python3 scripts/online_upgrade_package.py verify build/local.lx06ota
 ```
 

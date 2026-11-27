@@ -61,7 +61,9 @@ class PlaybackTailTest(unittest.TestCase):
             with serve(handler,'127.0.0.1',0) as server:
                 thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
                 writer=threading.Thread(target=microphone,daemon=True);writer.start()
-                env=dict(os.environ,XZ_WS_URL=f'ws://127.0.0.1:{server.socket.getsockname()[1]}/',XZ_DEVICE_ID='02:00:00:00:00:01',XZ_CLIENT_ID='00000000-0000-4000-8000-000000000001',XZ_ACCESS_TOKEN='fixture',XZ_MIC_FIFO=str(fifo),XZ_PLAYBACK='1',XZ_APLAY=str(player),XZ_BARGE_ANY='1',XZ_LOCAL_AEC='0',XZ_PLAYBACK_TAIL_MUTE_MS=str(tail_ms),XZ_TIMELINE_FILE='-')
+                # Test the legacy realtime uplink. The new guarded voice mode
+                # deliberately also mutes the primary uplink during fresh TTS.
+                env=dict(os.environ,XZ_WS_URL=f'ws://127.0.0.1:{server.socket.getsockname()[1]}/',XZ_DEVICE_ID='02:00:00:00:00:01',XZ_CLIENT_ID='00000000-0000-4000-8000-000000000001',XZ_ACCESS_TOKEN='fixture',XZ_MIC_FIFO=str(fifo),XZ_PLAYBACK='1',XZ_APLAY=str(player),XZ_BARGE_ANY='',XZ_FULL_DUPLEX='1',XZ_INTERRUPT_TEXT='等一下',XZ_LOCAL_AEC='0',XZ_PLAYBACK_TAIL_MUTE_MS=str(tail_ms),XZ_TIMELINE_FILE='-')
                 try: result=subprocess.run([str(ROOT/'build/xz_client')],env=env,capture_output=True,text=True,timeout=6)
                 finally: stop.set();writer.join(1)
                 server.shutdown();thread.join(2)

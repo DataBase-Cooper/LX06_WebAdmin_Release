@@ -1,14 +1,19 @@
 {
-  "version": "V20261127.7-rc44",
+  "version": "V20261127.8-rc45",
   "files": {
+    ".gitattributes": {
+      "sha256": "ea430c76469ec43e4af0a56713c84795525024aef1ace3cabce32b6796579ae5",
+      "bytes": 461,
+      "purpose": "本版公开源码、验证或下载说明"
+    },
     "NOTICE.md": {
       "sha256": "1dbc7f9232c21b5aa0a0b8a4945f07d5cbb90a0da72b000bfa5da3dcda35f42d",
       "bytes": 790,
       "purpose": "公开版本说明、构建方法与源码索引"
     },
     "README.md": {
-      "sha256": "9ef689512ffa3c371e8ad76e51015a191508c461f8e1aac10f1d49e46dadda69",
-      "bytes": 12371,
+      "sha256": "4cabb098e60163c817e1dfc6b1c5ef4212a7275b6f933a8e529b202f6ad18b55",
+      "bytes": 12756,
       "purpose": "项目首页、逐项功能说明、使用步骤与文档入口"
     },
     "docs/AI_HANDOFF.md": {
@@ -17,8 +22,8 @@
       "purpose": "公开版本说明、构建方法与源码索引"
     },
     "docs/BUILD.md": {
-      "sha256": "6825691b67de60ab0f150e02b930363996c5b0e23e357b9bd9850ebe607f439a",
-      "bytes": 7057,
+      "sha256": "18aa46489d8b7801e7d6e1cca41de7676f59284d5ee45c22096a6991f208a2b7",
+      "bytes": 7425,
       "purpose": "公开版本说明、构建方法与源码索引"
     },
     "docs/SCRIPT_AUTHORING.md": {
@@ -27,8 +32,8 @@
       "purpose": "Web88 脚本完整示例、开发步骤、配置与测试、AI 写作提示词"
     },
     "docs/SCRIPT_REFERENCE.md": {
-      "sha256": "0dbbbeafb18a157fea18d4485eb302474da49107833e19fcb3f3a59a04ff8dbc",
-      "bytes": 14717,
+      "sha256": "7fcc27c1f795600dd4991b4b32e6e74d237ec5e7b14ecadfeb0e7b7d64033bdc",
+      "bytes": 15093,
       "purpose": "七份脚本实际字段、按钮和使用条件"
     },
     "docs/SOURCE_MAP.md": {
@@ -63,6 +68,16 @@
     },
     "downloads/V20261127.7-rc44/SHA256SUMS.txt": {
       "sha256": "d676195b58e60dafc4c97371868b212057940b2c84ded62243e4a41715714270",
+      "bytes": 291,
+      "purpose": "公开成品包的 SHA-256 校验值"
+    },
+    "downloads/V20261127.8-rc45/README.md": {
+      "sha256": "c85a4f7797783c5e51d5b8ea122e68ca20e8fe41a3017effdbe4679cfc40d960",
+      "bytes": 929,
+      "purpose": "rc42 编译成品下载目录与对应使用场景"
+    },
+    "downloads/V20261127.8-rc45/SHA256SUMS.txt": {
+      "sha256": "7124295b1d36353b24bd852b23bfa6e1e7895582b86bb7e68e25a9b1bb7d00a5",
       "bytes": 291,
       "purpose": "公开成品包的 SHA-256 校验值"
     },
@@ -106,14 +121,19 @@
       "bytes": 108,
       "purpose": "Windows 刷机程序、固件包读取或驱动管理"
     },
+    "kws/lx06-installer/docs/dialog-light-api.md": {
+      "sha256": "ff374485d37f9a7f00606aa369e3cb6135039eece451e134b2f168524a37b834",
+      "bytes": 4517,
+      "purpose": "本版公开源码、验证或下载说明"
+    },
     "kws/lx06-installer/docs/script-extensions-v1.md": {
       "sha256": "6102b87945b8cb71b57701072aede6e37e848b920749f1f65c42fdb5722eea82",
       "bytes": 20962,
       "purpose": "Web88 的脚本扩展声明与显示规则协议"
     },
     "kws/lx06-installer/docs/xiaozhi-home-mcp.md": {
-      "sha256": "f9905aa0d9270c6c957653b294f6f1ff120a7224d073d87513b34d2d48589404",
-      "bytes": 2266,
+      "sha256": "dc2d3cff26099029a02d530ff43387af2130d095007329bc26f6d9ac4290b166",
+      "bytes": 2997,
       "purpose": "米家智能家居设置、接入协议与动作参数"
     },
     "kws/lx06-installer/docs/xiaozhi-mcp-task-polling.md": {
@@ -4427,9 +4447,9 @@
       "purpose": "原厂小爱音频桥、会话接管和麦克风读取"
     },
     "kws/lx06-installer/hooks/xiaoai/dialog-light-owner.h": {
-      "sha256": "3a16e552acfb96cbabee3ae7dd1d7c58736908c946590f101571ab2858a0f8d8",
-      "bytes": 7628,
-      "purpose": "原厂小爱音频桥、会话接管和麦克风读取"
+      "sha256": "9a4a18ffd1c0aa67d1e838e39aad1f03b9ef5183dcc0e217de92096d2fd72445",
+      "bytes": 11600,
+      "purpose": "脚本会话的灯效所有权、状态转移及恢复"
     },
     "kws/lx06-installer/hooks/xiaoai/dialog-light.c": {
       "sha256": "fcb18aafa9d8c3c7a19027d2591ab5710a9a4bf2ae484edf22e82db4c48adc0f",
@@ -4680,6 +4700,11 @@
       "sha256": "18b3563a5542ad614b64a86835db19d0343cae1db8842ac83c85063306cecfb3",
       "bytes": 19813,
       "purpose": "原厂小爱音频桥、会话接管和麦克风读取"
+    },
+    "kws/lx06-installer/hooks/xiaoai/stock-led-guard.inc": {
+      "sha256": "a5b58038ca282e4600b1a5531c2bebbb7cf7c57b050de19a268ee1ac2d795dbb",
+      "bytes": 687,
+      "purpose": "按会话锁协调原厂关灯与脚本会话灯效"
     },
     "kws/lx06-installer/hooks/xiaoai/stop.sh": {
       "sha256": "a40d687c6321a333939d6367589cdce8eb1304447b1db20b40fa5fbac29b0930",
@@ -5872,8 +5897,8 @@
       "purpose": "通用会话、音频输入输出和协议适配"
     },
     "kws/lx06-installer/runtime/dialogue-core/io/tests/fake-ubus.c": {
-      "sha256": "4614cc16e772be7baffcd5fdcbf95f5924ea35d27327ea4c8d9856c729572e09",
-      "bytes": 1562,
+      "sha256": "e9b25854a86d5191738fac5ff4456e1f7685ade48298f650f6db80846ae8261b",
+      "bytes": 2242,
       "purpose": "通用会话、音频输入输出和协议适配"
     },
     "kws/lx06-installer/runtime/dialogue-core/io/tests/fixture.c": {
@@ -5887,13 +5912,13 @@
       "purpose": "通用会话、音频输入输出和协议适配"
     },
     "kws/lx06-installer/runtime/dialogue-core/io/tests/light-owner-fixture.c": {
-      "sha256": "fc5b291d4ebab20bf37d505df0dfc74a3f3c8ebd19501db06816ba8b85031364",
-      "bytes": 4359,
+      "sha256": "028c1bb7aa6a3606197e128ff8ac38ba61c4960107f252c05eee640f61229ecf",
+      "bytes": 6797,
       "purpose": "通用会话、音频输入输出和协议适配"
     },
     "kws/lx06-installer/runtime/dialogue-core/io/tests/test_io.py": {
-      "sha256": "a770d6dbd2e64ef2270cca41624b641ffa2cd12c7d7ec0fac8ec07ac0f7f3397",
-      "bytes": 9591,
+      "sha256": "daf09bb15d4a0fd3fb8f4ec780bc498ac1388b80b63392b61175827952fe16cb",
+      "bytes": 9685,
       "purpose": "通用会话、音频输入输出和协议适配"
     },
     "kws/lx06-installer/runtime/dialogue-core/main.c": {
@@ -6767,13 +6792,13 @@
       "purpose": "豆包 C 客户端、音频打断与打包"
     },
     "kws/lx06-installer/runtime/doubao/src/echo.c": {
-      "sha256": "9791816faf4b31810a52bc59cd7d6f4f34e38590234e2e4c526ea231ae38272d",
-      "bytes": 6847,
-      "purpose": "豆包 C 客户端、音频打断与打包"
+      "sha256": "3073b9f3278c8c53f3d885d9f1b2f3126361ca59feab0c82d2c2d847e58e258c",
+      "bytes": 7314,
+      "purpose": "用播放器参考过滤语音打断时的回声"
     },
     "kws/lx06-installer/runtime/doubao/src/echo.h": {
-      "sha256": "bea84ca338f771128e7c053b01ec39d70c33d581bb8c9a0e380be3f48ae62dc5",
-      "bytes": 1132,
+      "sha256": "dd013184c008302d54e230959da559789fa7c159a273d0dcf7a7a82e3c9469ce",
+      "bytes": 1305,
       "purpose": "豆包 C 客户端、音频打断与打包"
     },
     "kws/lx06-installer/runtime/doubao/src/json.c": {
@@ -7007,9 +7032,9 @@
       "purpose": "独立 MCP 客户端、小爱通道词、后台回执与官方播报"
     },
     "kws/lx06-installer/runtime/model-adapter/mijia_mcp.sh": {
-      "sha256": "8c8d5730201c5f1ce856f4815c1daad492a2e197a6c907fed8b6a55ec3d5ad48",
-      "bytes": 1537,
-      "purpose": "复用原厂小爱登录并提交米家智能家居动作"
+      "sha256": "db9e1c6a7371b30deb78383ffb0b231a3706397b4de2cdf6c0175047d1bca04a",
+      "bytes": 1996,
+      "purpose": "使用原厂小爱登录来提交米家设备操作"
     },
     "kws/lx06-installer/runtime/model-adapter/model-asr.c": {
       "sha256": "d7a4ab82e8420dcae22bb9b07a8d45dce8c1e73fd91ecdc138b67d115efceb16",
@@ -7202,8 +7227,8 @@
       "purpose": "模型账户、登录、远端对话、问候及扩展声明"
     },
     "kws/lx06-installer/runtime/model-adapter/test_voice_setup_flow.py": {
-      "sha256": "0f76ab4ed737c9d5ffa5f062395b84d5131dec8e2152cddb6708922cb01340fd",
-      "bytes": 6225,
+      "sha256": "87d268d036f821c74a35b10f4d6026fe42138a2b8ba5c4b1087a76c4b23fe4bf",
+      "bytes": 6812,
       "purpose": "模型账户、登录、远端对话、问候及扩展声明"
     },
     "kws/lx06-installer/runtime/model-adapter/test_xiaozhi_binding_ui.py": {
@@ -7292,8 +7317,8 @@
       "purpose": "模型账户、登录、远端对话、问候及扩展声明"
     },
     "kws/lx06-installer/runtime/model-adapter/voice_settings.py": {
-      "sha256": "7d6bef85250a986fda0470676ae8a6a6e7e686d6a6437be0eda6203160f6f003",
-      "bytes": 16508,
+      "sha256": "2ab5293babbb5128aef5e3b9d54b9e9ca0b9e30f09a1561bc011c82a3f320b0f",
+      "bytes": 17168,
       "purpose": "生成小智和豆包脚本的扩展配置声明及字段可见条件"
     },
     "kws/lx06-installer/runtime/model-adapter/xiaozhi-binding-ui.sh": {
@@ -7541,6 +7566,56 @@
       "bytes": 2266,
       "purpose": "本版公开源码与下载文档"
     },
+    "kws/lx06-installer/scripts/examples/user-scripts/V20261127.8-rc45/MCP 接入说明.md": {
+      "sha256": "cf888cc38b701d7e53e22d4d539958656ad616b84764aec879c4696ee932c410",
+      "bytes": 4243,
+      "purpose": "本版公开源码与下载文档"
+    },
+    "kws/lx06-installer/scripts/examples/user-scripts/V20261127.8-rc45/chatgpt_account.sh": {
+      "sha256": "2b3b02664ea09bfe2defc9c7c441965b2f681527013f0f26590a65962ca84095",
+      "bytes": 52189,
+      "purpose": "rc42 脱敏配套脚本，个人配置由设备保存"
+    },
+    "kws/lx06-installer/scripts/examples/user-scripts/V20261127.8-rc45/deepseek_account.sh": {
+      "sha256": "b0d0d4bbf6bf61ae64dd3dc46c49ca76da856c4e76e42fbaff056e6beeef9641",
+      "bytes": 127278,
+      "purpose": "rc42 脱敏配套脚本，个人配置由设备保存"
+    },
+    "kws/lx06-installer/scripts/examples/user-scripts/V20261127.8-rc45/doubao_watch.sh": {
+      "sha256": "495867b9b74c92398d1fd7726020d32cedcad28e7c6c92b819bb763da44946e7",
+      "bytes": 156616,
+      "purpose": "rc42 脱敏配套脚本，个人配置由设备保存"
+    },
+    "kws/lx06-installer/scripts/examples/user-scripts/V20261127.8-rc45/grok_account.sh": {
+      "sha256": "54479dd95712383f708893b50318815aaaf6031f042e7b1b763d32438c2c132d",
+      "bytes": 43577,
+      "purpose": "rc42 脱敏配套脚本，个人配置由设备保存"
+    },
+    "kws/lx06-installer/scripts/examples/user-scripts/V20261127.8-rc45/mcp_task_watch.sh": {
+      "sha256": "7f7b8fd5e76f8d29043e27b4bcd2a96f699e8f86b0f57066d394cf72775329d2",
+      "bytes": 7273,
+      "purpose": "rc42 脱敏配套脚本，个人配置由设备保存"
+    },
+    "kws/lx06-installer/scripts/examples/user-scripts/V20261127.8-rc45/mijia_mcp.sh": {
+      "sha256": "db9e1c6a7371b30deb78383ffb0b231a3706397b4de2cdf6c0175047d1bca04a",
+      "bytes": 1996,
+      "purpose": "使用原厂小爱登录来提交米家设备操作"
+    },
+    "kws/lx06-installer/scripts/examples/user-scripts/V20261127.8-rc45/open-door.sh": {
+      "sha256": "deba2dc0cd2acbf25c5bf9cd2a53c12fb150f5031be38bb7e04dd6bbd101b5d0",
+      "bytes": 6165,
+      "purpose": "rc42 脱敏配套脚本，个人配置由设备保存"
+    },
+    "kws/lx06-installer/scripts/examples/user-scripts/V20261127.8-rc45/xz_watch.sh": {
+      "sha256": "eda2b71562232db8333ac333ba2b61841cf4bfd97816caf128790b9b4ffc30b7",
+      "bytes": 276790,
+      "purpose": "小智配对、双模式打断、音量门槛和米家控制脚本"
+    },
+    "kws/lx06-installer/scripts/examples/user-scripts/V20261127.8-rc45/米家接入说明.md": {
+      "sha256": "394587627b89b0b521113289126ea186d762bc25039e85e5d6a16b436de7229c",
+      "bytes": 2291,
+      "purpose": "本版公开源码与下载文档"
+    },
     "kws/lx06-installer/scripts/extract_release_libraries.py": {
       "sha256": "756974361f63ea7de7b873cb5848bb1d451e33b7224042e81ac44144d89794a0",
       "bytes": 2400,
@@ -7550,6 +7625,11 @@
       "sha256": "b1937b02bf78ade046b7d1ea99bbb3b9b3a6c4d42ef0e4bbc6c30b2c3b429556",
       "bytes": 8081,
       "purpose": "Windows、固件、ARM 客户端构建及打包工具"
+    },
+    "kws/lx06-installer/scripts/patch_stock_led.py": {
+      "sha256": "d0dcfd4f1e8b41f57669562ba5d21d182c175c261b3fc951275357d07a515bc7",
+      "bytes": 766,
+      "purpose": "构建时生成带灯效互锁的原厂灯光入口"
     },
     "kws/lx06-installer/scripts/refresh_candidate_release.py": {
       "sha256": "8edade2e16ee504985a572b9e148a0e5ea39d8aac56a80dc7e4e92bf45ce506c",
@@ -7575,6 +7655,11 @@
       "sha256": "826151202cdc961dcb3599bbe052115f4fd7c94520403afd591a6ea1a43bd6a1",
       "bytes": 4903,
       "purpose": "Windows、固件、ARM 客户端构建及打包工具"
+    },
+    "kws/lx06-installer/scripts/stage_passive_wake.py": {
+      "sha256": "a15269990079793eb22b9cae0501c4ce0fb7f11ed30aaddc31a741eea8f641c2",
+      "bytes": 6771,
+      "purpose": "本版公开源码、验证或下载说明"
     },
     "kws/lx06-installer/scripts/xz_home_mcp_options.sh": {
       "sha256": "5b6bd33a8bf3c67c069bc0479094b756c02d5170a024507e4d8b8e976def7fc2",
@@ -7917,13 +8002,13 @@
       "purpose": "Windows 刷机程序、固件包读取或驱动管理"
     },
     "kws/lx06-installer/人工验收.md": {
-      "sha256": "ae91ebdb6ddc54ed4f7d960f1cf9583d6669abd6b756efcedaf1f8f482c376e9",
-      "bytes": 805,
+      "sha256": "a3fa56ca8825048b2295b54be9f3b6dadd64ebffa3e7b957c96c72ad9cd27cb3",
+      "bytes": 751,
       "purpose": "rc42 验收记录、固件范围和七个配套脚本说明"
     },
     "kws/scratch/xz-client-rewrite/Makefile": {
-      "sha256": "dda30f24cdfb884f061ea89ce0edd0fe08561518e1a7476077119612e8b6b65d",
-      "bytes": 3580,
+      "sha256": "b6d0dfb3bc96fcf2a89293a0b938e468302ecd36785da08b12ae2cd54253e69c",
+      "bytes": 3946,
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/requirements.md": {
@@ -7932,8 +8017,8 @@
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/scripts/build-armhf.sh": {
-      "sha256": "ac596874a8cd321e11e9411938da7b24d4fa29f2872acaf5cbfbe71cf1bab020",
-      "bytes": 3416,
+      "sha256": "b631eb5231716a3f86322587400982b97a2083ee4207a10a09d7ba3a3d42ba40",
+      "bytes": 3467,
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/src/aec.c": {
@@ -7957,13 +8042,13 @@
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/src/home_mcp.c": {
-      "sha256": "8adf4b4ec9b792b50856622e17976c39f1c87f3af367832eaf2bc46d0f5a8819",
-      "bytes": 17074,
+      "sha256": "680a9d4b7201e703a26de407c084b49d55054adb3504937ec22a008200f2123c",
+      "bytes": 18702,
       "purpose": "小智 WebSocket MCP、明确语音开关指令及所选脚本调用"
     },
     "kws/scratch/xz-client-rewrite/src/home_mcp.h": {
-      "sha256": "59d68dbd3543010a6c70b20453a32f364ee76f92c06ae17561706d28ae504677",
-      "bytes": 831,
+      "sha256": "a3194ef16117c97c661585b4a3c0cac5b3a84a5667463fc306de20db46193cb8",
+      "bytes": 959,
       "purpose": "智能家居会话和工作进程的公开接口"
     },
     "kws/scratch/xz-client-rewrite/src/identity.c": {
@@ -7992,8 +8077,8 @@
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/src/main.c": {
-      "sha256": "98f5953939d203bb197fe4625ab35d22d73c3eed6e2fcfdd2b307e329f7a1d3b",
-      "bytes": 69819,
+      "sha256": "b827b80d01ea358e47fda0316e3ec6c8691348172ab481b0e5eabc9b22eaed6a",
+      "bytes": 77428,
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/src/opus_codec.c": {
@@ -8007,13 +8092,13 @@
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/src/player.c": {
-      "sha256": "c96ec7a29eddc2008e8f55d9b21b7e3c7ec028d2f992e15bb0656de898ec980b",
-      "bytes": 11961,
+      "sha256": "b2cb047977040d88ecb986a35b43bf3aa305ba0bfe027f44f2aec83803de5b47",
+      "bytes": 12219,
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/src/player.h": {
-      "sha256": "2019b927ca76f020f80f4a8f03ede730dcb7bbdfa65d350fbd2623f803958f35",
-      "bytes": 1186,
+      "sha256": "e668a740b435dfe0fb127d976b213a4b19c98c808e48990d5648dafb76b5caf6",
+      "bytes": 1313,
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/src/protocol.c": {
@@ -8057,13 +8142,13 @@
       "purpose": "小智 MCP 会话及任务轮询的数据结构"
     },
     "kws/scratch/xz-client-rewrite/src/text_match.c": {
-      "sha256": "bef8f8644f191c92025acc72dd438db5e127fdf805cbdcbce21aec27c6c41a65",
-      "bytes": 8456,
+      "sha256": "793975766b478b83b632a59ce9d98e42b174ecb278ccbc826b98fd97a54e2297",
+      "bytes": 8627,
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/src/text_match.h": {
-      "sha256": "6c163215ee90187c0e7fdd74fb9ca97a458cbe21d9deb83d27c42c8911af52f9",
-      "bytes": 692,
+      "sha256": "7f7b6db7a025895f21e8c9805a444cfe8f21f3e339f697d61ff47b76c32d67bf",
+      "bytes": 752,
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/src/timeline.c": {
@@ -8107,8 +8192,8 @@
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/tests/test_dual_barge.py": {
-      "sha256": "fbadc80c3bfef2e4b8153f82ff9aeebcf5f4e8fd8845eb8e62422d76bae31fbc",
-      "bytes": 14196,
+      "sha256": "818bef4ba6e40739b7c6384f0c3d51dc44200109ad4e9c3d0f82a63ef4a2dfae",
+      "bytes": 19832,
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/tests/test_event.c": {
@@ -8116,9 +8201,14 @@
       "bytes": 1668,
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
+    "kws/scratch/xz-client-rewrite/tests/test_home_feedback_runtime.py": {
+      "sha256": "2c9dfface42ecd732fd05475889944afeffb2a5ad4341f365e115e95a231f453",
+      "bytes": 8316,
+      "purpose": "本版公开源码、验证或下载说明"
+    },
     "kws/scratch/xz-client-rewrite/tests/test_home_mcp.c": {
-      "sha256": "3e9fb3b32a8a50520f012449d9dddae5a7f5504912b5debe25276846881999da",
-      "bytes": 6752,
+      "sha256": "430f003f7690023fdaee027db48dd51f3c5195789d0cf705f16ea99db393b0b1",
+      "bytes": 9007,
       "purpose": "智能家居脚本选择、请求校验、去重及超时回归"
     },
     "kws/scratch/xz-client-rewrite/tests/test_identity.c": {
@@ -8162,8 +8252,8 @@
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/tests/test_playback_tail_runtime.py": {
-      "sha256": "edd08284f5e9c60dea73e0b3ac0dddf385eb1db1ff9fc8f3f48ea71b82a2e04b",
-      "bytes": 4639,
+      "sha256": "9cfb061a7a4eeb3f62e5c1231e66c82a61d94893421e14964047e258d8d56f11",
+      "bytes": 4844,
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/tests/test_player.c": {
@@ -8177,8 +8267,8 @@
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/tests/test_runtime_integration.py": {
-      "sha256": "f78aa4ad25d0985dec622f5c8d59231fc09a77141335c437810c6a9cc151faee",
-      "bytes": 45790,
+      "sha256": "9b87d79b10095b8b39dcd3b16e743aaee40e3003f4661e3e907ac48c30894cb0",
+      "bytes": 45921,
       "purpose": "小智 C 客户端、协议、手动断句和 ARM 构建"
     },
     "kws/scratch/xz-client-rewrite/tests/test_session.c": {

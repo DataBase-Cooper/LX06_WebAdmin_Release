@@ -10,11 +10,12 @@ TEST_BUILD := $(BUILD)/tests
 CLIENT_SOURCES := \
 src/aec.c src/event.c src/home_mcp.c src/identity.c src/json.c src/main.c src/opus_codec.c src/player.c \
 src/protocol.c src/session.c src/talk.c src/task_poll.c src/text_match.c src/timeline.c src/ws.c src/ws_frame.c \
-../../lx06-installer/runtime/common/control_asr.c
+../../lx06-installer/runtime/common/control_asr.c ../../lx06-installer/runtime/doubao/src/echo.c
 
 UNIT_TESTS := test_json test_protocol test_session test_event test_timeline test_aec \
 	test_player test_opus_codec test_text_match test_ws_frame test_identity test_talk test_input_gain test_home_mcp
 INTEGRATION_BINARY := $(TEST_BUILD)/test_ws_client
+HOME_FEEDBACK_BINARY := $(TEST_BUILD)/xz_client_home_feedback
 
 .PHONY: all test armhf-package-test clean
 
@@ -71,10 +72,14 @@ $(TEST_BUILD)/test_talk: src/talk.c tests/test_talk.c | $(TEST_BUILD)
 $(TEST_BUILD)/test_ws_client: src/ws.c src/ws_frame.c tests/test_ws_client.c | $(TEST_BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $^ -o $@ -lssl -lcrypto
 
-test: all $(addprefix $(TEST_BUILD)/,$(UNIT_TESTS)) $(INTEGRATION_BINARY)
+$(HOME_FEEDBACK_BINARY): $(CLIENT_SOURCES) src/home_mcp.h | $(TEST_BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DXZ_HOME_MCP_APPS='"."' $(CLIENT_SOURCES) -o $@ $(LDLIBS)
+
+test: all $(addprefix $(TEST_BUILD)/,$(UNIT_TESTS)) $(INTEGRATION_BINARY) $(HOME_FEEDBACK_BINARY)
 	@set -e; for test in $(addprefix $(TEST_BUILD)/,$(UNIT_TESTS)); do $$test; done
 	@XZ_WS_TEST_BINARY=$(CURDIR)/$(INTEGRATION_BINARY) python3 tests/test_ws_integration.py
 	@XZ_CLIENT_BINARY=$(CURDIR)/$(BUILD)/xz_client python3 tests/test_runtime_integration.py
+	@python3 tests/test_home_feedback_runtime.py $(HOME_FEEDBACK_BINARY)
 	@python3 tests/test_idle_runtime.py
 	@python3 tests/test_task_poll_runtime.py
 	@python3 tests/test_tts_overlap_runtime.py

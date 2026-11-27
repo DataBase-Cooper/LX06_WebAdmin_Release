@@ -21,7 +21,8 @@ CASES = ['player-fifo', 'player-partial', 'player-recover', 'player-stop',
          'capture-v2-malformed', 'capture-v2-invalid-metadata', 'capture-v2-explicit',
          'alsa-public-abi']
 OWNER_CASES = ['transition', 'same-effect', 'failure-keeps-light',
-               'client-end-active', 'slow-obsolete', 'close-slow']
+               'client-end-active', 'slow-obsolete', 'close-slow', 'restore-cleared-effect',
+               'silent-defers-restore', 'native-cleanup-interlock']
 
 
 def sha(path):

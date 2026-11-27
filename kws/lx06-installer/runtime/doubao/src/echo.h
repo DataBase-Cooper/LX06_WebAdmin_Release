@@ -15,6 +15,7 @@ typedef struct {
     pthread_mutex_t lock;
     unsigned speech_rms;
     unsigned strong_protection;
+    unsigned require_reference;
     int16_t reference[DB_ECHO_REFERENCE];
     size_t head, used;
     unsigned phase;
@@ -27,6 +28,8 @@ typedef struct {
 } db_echo;
 
 void db_echo_reference(db_echo *, const unsigned char *, size_t bytes, uint64_t now);
+void db_echo_reference_rate(db_echo *, const unsigned char *, size_t bytes,
+                            uint64_t now, unsigned sample_rate);
 int db_echo_keyword_filter(db_echo *, const unsigned char *pcm, uint64_t now,
                            unsigned char *clean);
 int db_echo_filter(db_echo *, const unsigned char *pcm, int playing, uint64_t now,

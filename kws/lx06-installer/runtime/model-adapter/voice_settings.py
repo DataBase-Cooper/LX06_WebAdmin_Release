@@ -84,16 +84,19 @@ def xiaozhi_pause_visibility(schema):
 def schema(provider):
     db = provider == 'doubao'
     prefix, title = ('DB', '豆包') if db else ('XZ', '小智')
-    fields = ([field(prefix+'_BARGE_ANY','打断方式',0,'select',options=['0','1'],
-                     optionLabels=['打断词','人声'],widget='segments')] if db else []) + [
-        field('DB_INTERRUPT' if db else 'XZ_INTERRUPT_TEXT', '打断词', WORDS, format='aliases' if db else 'words'),
+    interrupt_field = 'DB_INTERRUPT' if db else 'XZ_INTERRUPT_TEXT'
+    barge_default = 760 if db else 1400
+    fields = [
+        field(prefix+'_BARGE_ANY','打断方式',0,'select',options=['0','1'],
+              optionLabels=['打断词','人声'],widget='segments'),
+        field(prefix+'_BARGE_RMS', '打断音量门槛', barge_default, 'number',
+              widget='slider', min=400, max=8000, step=20, precision=0, center=barge_default),
+        field(interrupt_field, '打断词', WORDS, format='aliases' if db else 'words'),
         field('DB_GOODBYE' if db else 'XZ_GOODBYE_TEXT', '结束词', title+'再见,再见'+title+',拜拜了哦', format='words'),
         field('official_wake', '小爱通道词（留空关闭）', title+'出来,召唤'+title, format='aliases'),
     ]
     if db:
-        fields[1:1] = [
-            field('DB_BARGE_RMS', '打断音量门槛', 760, 'number',
-                  widget='slider', min=400, max=8000, step=20, precision=0, center=760),
+        fields[2:2] = [
             field('DB_ECHO_PROTECTION', '回声保护', 0, 'select',
                   widget='segments', options=['0','1'], optionLabels=['标准','增强']),
         ]
@@ -140,12 +143,12 @@ def schema(provider):
                     dict(id='save', label='保存设置' if db else '保存配置', fields=[f['name'] for f in fields])]
                     + ([dict(id='verify-key', label='验证连接', fields=[f['name'] for f in fields])]
                        if db else [dict(id='bind', label='检查绑定', fields=[])]))
+    result['conditions'] = [dict(id='keyword-mode', source='settings.'+prefix+'_BARGE_ANY', equals='0'),
+                            dict(id='human-mode', source='settings.'+prefix+'_BARGE_ANY', equals='1')]
+    result['visibility'] = [dict(target='fields.'+interrupt_field, conditions=['keyword-mode']),
+                            dict(target='fields.'+prefix+'_BARGE_RMS', conditions=['human-mode'])]
     if db:
-        result['conditions'] = [dict(id='keyword-mode', source='settings.DB_BARGE_ANY', equals='0'),
-                                dict(id='human-mode', source='settings.DB_BARGE_ANY', equals='1')]
-        result['visibility'] = [dict(target='fields.DB_INTERRUPT', conditions=['keyword-mode']),
-                                dict(target='fields.DB_BARGE_RMS', conditions=['human-mode']),
-                                dict(target='fields.DB_ECHO_PROTECTION', conditions=['human-mode'])]
+        result['visibility'].append(dict(target='fields.DB_ECHO_PROTECTION', conditions=['human-mode']))
         result['flow'] = dict(initial='connect',steps=[
             step('connect','连接豆包',['DB_API_KEY'],['verify-key'],
                  description='输入 API Key，验证通过后自动保存。'),
@@ -224,13 +227,19 @@ def integrate(text, provider, candidate=False):
     text=re.sub(r'^# LX06-(?:SETTINGS: official_wake|SESSION-MANAGED: on)\n','',text,flags=re.M)
     if provider in ('xiaozhi', 'xz'):
         text = xiaozhi_home_mcp_catalog(upgrade_xiaozhi(text))
-        fixed = f"export XZ_WS_URL='{XIAOZHI_URL}' XZ_BARGE_ANY=0"
-        text = re.sub(r'(?m)^export XZ_(?:WS_URL=.* XZ_BARGE_ANY|BARGE_ANY)=0$', fixed, text, count=1)
+        fixed = f"export XZ_WS_URL='{XIAOZHI_URL}'"
+        text = re.sub(r'(?m)^export XZ_(?:WS_URL=.* XZ_BARGE_ANY|BARGE_ANY)=[01]$', fixed, text, count=1)
         if fixed not in text:
             text = text.replace('#!/bin/sh\n', '#!/bin/sh\n'+fixed+'\n', 1)
-        # Parent configuration and legacy stores must not override fixed settings.
-        text = re.sub(r'(?m)^  export XZ_FULL_DUPLEX=0 XZ_BARGE_IN=0 XZ_LOCAL_AEC=1(?: XZ_BARGE_ANY=0)?(?: XZ_WS_URL=\x27[^\x27]*\x27)?$',
-                      f'  export XZ_FULL_DUPLEX=0 XZ_BARGE_IN=0 XZ_LOCAL_AEC=1 XZ_BARGE_ANY=0 XZ_WS_URL=\'{XIAOZHI_URL}\'', text)
+        mode_default = 'export XZ_BARGE_ANY="${XZ_BARGE_ANY:-0}"'
+        if mode_default not in text:
+            text = text.replace(fixed+'\n', fixed+'\n'+mode_default+'\n', 1)
+        # script-settings injects the user's choice into the launcher. Only
+        # the transport and the prerequisite audio route are fixed here.
+        text = re.sub(r'(?m)^  export XZ_FULL_DUPLEX=0 XZ_BARGE_IN=0 XZ_LOCAL_AEC=1(?: XZ_BARGE_ANY=[01])?(?: XZ_WS_URL=\x27[^\x27]*\x27)?$',
+                      f'  export XZ_FULL_DUPLEX=0 XZ_BARGE_IN=0 XZ_LOCAL_AEC=1 XZ_WS_URL=\'{XIAOZHI_URL}\'', text)
+        text = re.sub(r'(?m)^  # This does not enable the legacy local energy-based interruption trigger;\n  # XZ_BARGE_ANY still selects native speech or explicit control-word mode\.\n', '', text)
+        text = re.sub(r'(?m)^# XZ_BARGE_ANY=1：[^\n]*$', '# XZ_BARGE_ANY=1：人声打断，由播放参考和语音识别共同确认。', text)
     else:
         pos=text.index('if [ "${1:-}" = --web-action ]; then')
         ui=Path(__file__).with_name('doubao-setup-ui.sh').read_text('utf8').rstrip()

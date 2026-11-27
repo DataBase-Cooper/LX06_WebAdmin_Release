@@ -99,7 +99,106 @@ class DualBargeTest(unittest.TestCase):
         else:self.assertIn('event=SERVER_ABORT',text)
     def test_keyword_mode_isolates_primary_and_ends_from_auxiliary(self):
         with SpeakerASR() as asr:self.exercise(0,asr)
-    def test_native_mode_needs_no_auxiliary_service(self):self.exercise(1)
+    def test_human_mode_checks_playback_and_threshold_before_replaying_speech(self):
+        for threshold, interrupts in ((None, True), (8000, False)):
+            with self.subTest(threshold=threshold), SpeakerASR() as asr:
+                self.check_human_interruption(asr, threshold, interrupts)
+
+    def check_human_interruption(self, asr, threshold, interrupts):
+        errors = []
+        codec = OpusCodec()
+
+        def wave(rate, frequency, amplitude):
+            return [round(amplitude * math.sin(2 * math.pi * frequency * i / rate))
+                    for i in range(rate * 60 // 1000)]
+
+        echo = struct.pack('<960h', *wave(16000, 400, 6000))
+        voice = struct.pack('<960h', *wave(16000, 1300, 3100))
+        reply = codec.encode_pcm(24000, wave(24000, 400, 8500))
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fifo = root / 'mic.fifo'
+            os.mkfifo(fifo)
+            player = root / 'player'
+            player.write_text('#!/bin/sh\ncat >/dev/null\n')
+            player.chmod(0o700)
+
+            def handler(ws):
+                try:
+                    def send(**message):
+                        ws.send(json.dumps(message))
+
+                    self.assertEqual(json.loads(ws.recv(timeout=3))['type'], 'hello')
+                    send(type='hello', version=1, session_id='human-fixture', transport='websocket',
+                         audio_params=dict(format='opus', sample_rate=24000, channels=1, frame_duration=60))
+                    self.assertEqual(json.loads(ws.recv(timeout=3))['mode'], 'auto')
+                    with fifo.open('wb', buffering=0) as mic:
+                        send(type='tts', state='start')
+                        send(type='tts', state='sentence_start', text='这是小智正在播放的天气预报')
+                        ws.send(reply)
+                        time.sleep(.08)
+                        for _ in range(10):
+                            ws.send(reply)
+                            mic.write(echo)
+                            packet = ws.recv(timeout=2)
+                            self.assertIsInstance(packet, bytes)
+                            self.assertLess(codec.decode_rms(packet, 16000, 960), 1)
+                            time.sleep(.05)
+                        # Even a stray recognizer transcript must be backed by
+                        # independent PCM rather than the speaker's loud echo.
+                        dialog = asr.emit('请问今天星期几', final=False)
+                        for _ in range(4):
+                            mic.write(echo)
+                            self.assertIsInstance(ws.recv(timeout=2), bytes)
+                            time.sleep(.045)
+                        asr.emit('这是小智正在播放的天气预报', final=False, dialog=dialog)
+                        for _ in range(7):
+                            mic.write(voice)
+                            self.assertIsInstance(ws.recv(timeout=2), bytes)
+                            time.sleep(.045)
+                        asr.emit('请问今天星期几', final=False, dialog=dialog)
+                        if interrupts:
+                            self.assertEqual(json.loads(ws.recv(timeout=2))['type'], 'abort')
+                            self.assertEqual(json.loads(ws.recv(timeout=2))['state'], 'start')
+                            replayed = [ws.recv(timeout=2) for _ in range(3)]
+                            self.assertTrue(all(isinstance(packet, bytes) for packet in replayed))
+                            for _ in range(8):
+                                mic.write(voice)
+                            resumed = replayed + [ws.recv(timeout=2) for _ in range(8)]
+                            self.assertGreater(max(codec.decode_rms(p, 16000, 960) for p in resumed), 300)
+                            send(type='abort', reason='speech_detected')
+                        else:
+                            for _ in range(5):
+                                mic.write(voice)
+                                self.assertIsInstance(ws.recv(timeout=2), bytes)
+                            with self.assertRaises(TimeoutError):
+                                ws.recv(timeout=.15)
+                        send(type='goodbye')
+                except BaseException as exc:
+                    errors.append(exc)
+
+            with serve(handler, '127.0.0.1', 0) as server:
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                env = dict(os.environ, XZ_WS_URL=f'ws://127.0.0.1:{server.socket.getsockname()[1]}/',
+                           XZ_DEVICE_ID='02:00:00:00:00:01', XZ_CLIENT_ID='human-fixture',
+                           XZ_ACCESS_TOKEN='fixture', XZ_MIC_FIFO=str(fifo), XZ_APLAY=str(player),
+                           XZ_WAKE_TEXT='', XZ_TIMELINE_FILE='-', XZ_TALK_LOG='0',
+                           XZ_BARGE_ANY='1',
+                           LX06_CONTROL_ASR_SOCKET=asr.path)
+                if threshold is None:
+                    env.pop('XZ_BARGE_RMS', None)
+                else:
+                    env['XZ_BARGE_RMS'] = str(threshold)
+                result = subprocess.run([str(ROOT / 'build/xz_client')], env=env, capture_output=True,
+                                        text=True, timeout=12)
+                server.shutdown()
+                thread.join(2)
+        self.assertEqual(errors, [], result.stderr)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f'event=HUMAN_BARGE_READY rms={threshold or 1400}', result.stderr)
+        self.assertEqual(result.stderr.count('event=HUMAN_BARGE '), int(interrupts))
 
     def test_manual_listen_waits_for_the_configured_silence(self):
         frame = struct.pack('<960h', *(

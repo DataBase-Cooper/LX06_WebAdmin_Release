@@ -46,11 +46,14 @@ static int wait_child_nonblocking(xz_player *player) {
     return 1;
 }
 
-static int write_pipe_all(int fd, const unsigned char *data, size_t length) {
+static int write_pipe_all(xz_player *player, int fd, const unsigned char *data, size_t length) {
     size_t offset = 0;
     while (offset < length) {
         ssize_t n = write(fd, data + offset, length - offset);
         if (n > 0) {
+            if (player->observe_pcm)
+                player->observe_pcm(player->observe_context, data + offset, (size_t)n,
+                                    player->sample_rate);
             offset += (size_t)n;
             continue;
         }
@@ -143,7 +146,7 @@ static void *player_worker(void *arg) {
         pthread_cond_broadcast(&player->cond);
         pthread_mutex_unlock(&player->mutex);
 
-        if (fd < 0 || write_pipe_all(fd, chunk, length) != 0) {
+        if (fd < 0 || write_pipe_all(player, fd, chunk, length) != 0) {
             pthread_mutex_lock(&player->mutex);
             /* The pipe closes when an explicit abort kills its reader. */
             if (!player->aborting) {
@@ -228,6 +231,7 @@ int xz_player_start(xz_player *player, const char *program, const char *device, 
     player->error = 0;
     player->exit_code = -1;
     player->period_ms = PLAYER_PERIOD_SAMPLES * 1000 / (unsigned)sample_rate;
+    player->sample_rate = (unsigned)sample_rate;
     player->head = player->tail = player->used = 0;
     pthread_mutex_unlock(&player->mutex);
 

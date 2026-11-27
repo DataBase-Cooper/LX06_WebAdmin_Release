@@ -1,0 +1,8 @@
+kws/lx06-installer/hooks/init-launch.sh text eol=lf
+kws/lx06-installer/hooks/init.sh text eol=lf
+kws/lx06-installer/hooks/ssh.sh text eol=lf
+kws/lx06-installer/hooks/ssh-lan.sh text eol=lf
+kws/lx06-installer/scripts/build_ssh_base.sh text eol=lf
+kws/lx06-installer/runtime/model-adapter/mijia_mcp.sh text eol=lf
+kws/lx06-installer/scripts/examples/user-scripts/V20261127.8-rc45/*.sh text eol=lf
+kws/scratch/xz-client-rewrite/scripts/build-armhf.sh text eol=lf

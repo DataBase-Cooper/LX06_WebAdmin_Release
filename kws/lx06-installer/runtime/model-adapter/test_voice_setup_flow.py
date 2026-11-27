@@ -35,8 +35,14 @@ printf '\\123\\234' >> "$WORK/client.gz"
             fields = {field['name']: field for field in schema['fields']}
             if provider == 'doubao':
                 self.assertEqual(fields['DB_BARGE_ANY']['default'], '1')
+                self.assertEqual(fields['DB_BARGE_RMS']['default'], '760')
             else:
-                self.assertNotIn('XZ_BARGE_ANY', fields)
+                self.assertEqual(fields['XZ_BARGE_ANY']['default'], '0')
+                self.assertEqual(fields['XZ_BARGE_RMS']['default'], '1400')
+                self.assertEqual(fields['XZ_BARGE_RMS']['center'], 1400)
+                self.assertEqual((fields['XZ_BARGE_RMS']['min'], fields['XZ_BARGE_RMS']['max']), (400, 8000))
+                self.assertIn(dict(target='fields.XZ_BARGE_RMS', conditions=['human-mode']), schema['visibility'])
+                self.assertIn(dict(target='fields.XZ_INTERRUPT_TEXT', conditions=['keyword-mode']), schema['visibility'])
             with tempfile.NamedTemporaryFile('w',suffix='.sh') as f:
                 f.write(twice);f.flush();subprocess.run(['sh','-n',f.name],check=True)
             if provider=='xiaozhi':

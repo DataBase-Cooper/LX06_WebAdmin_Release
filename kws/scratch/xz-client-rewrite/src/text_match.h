@@ -2,6 +2,7 @@
 #define XZ_TEXT_MATCH_H
 
 int xz_text_is_echo(const char *observed, const char *spoken);
+int xz_text_has_speech(const char *text, unsigned minimum);
 int xz_text_matches_phrase(const char *observed, const char *phrase);
 int xz_text_is_phrase(const char *observed, const char *phrase);
 /* list is comma-separated. ASCII comma, fullwidth comma, or ideographic comma. */

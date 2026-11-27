@@ -13,10 +13,10 @@ static int16_t sample(const unsigned char *pcm) {
     return value;
 }
 
-static void append(db_echo *echo,int16_t value) {
+static void append(db_echo *echo,int16_t value,unsigned decimation) {
     echo->sum+=value;
-    if(++echo->phase!=6) return;
-    echo->reference[echo->head]=(int16_t)(echo->sum/6);
+    if(++echo->phase!=decimation) return;
+    echo->reference[echo->head]=(int16_t)(echo->sum/(int)decimation);
     echo->head=(echo->head+1)%DB_ECHO_REFERENCE;
     if(echo->used<DB_ECHO_REFERENCE) ++echo->used;
     echo->phase=0;
@@ -25,7 +25,9 @@ static void append(db_echo *echo,int16_t value) {
 
 /* Match the microphone to PCM accepted by the playback pipe. Keep sample
  * order across writes and leave the recent reference available for the tail. */
-void db_echo_reference(db_echo *echo,const unsigned char *pcm,size_t bytes,uint64_t now) {
+void db_echo_reference_rate(db_echo *echo,const unsigned char *pcm,size_t bytes,
+                            uint64_t now,unsigned sample_rate) {
+    unsigned decimation=sample_rate==16000?4:6;
     pthread_mutex_lock(&echo->lock);
     if(now<echo->accepted_at_ms || now-echo->accepted_at_ms>=REFERENCE_LIFETIME_MS) {
         echo->head=echo->used=0;
@@ -36,14 +38,18 @@ void db_echo_reference(db_echo *echo,const unsigned char *pcm,size_t bytes,uint6
     size_t offset=0;
     if(echo->have_partial && bytes) {
         unsigned char pair[]={echo->partial,pcm[0]};
-        append(echo,sample(pair));
+        append(echo,sample(pair),decimation);
         echo->have_partial=0;
         offset=1;
     }
-    for(;offset+1<bytes;offset+=2) append(echo,sample(pcm+offset));
+    for(;offset+1<bytes;offset+=2) append(echo,sample(pcm+offset),decimation);
     if(offset<bytes) { echo->partial=pcm[offset];echo->have_partial=1; }
     echo->accepted_at_ms=now;
     pthread_mutex_unlock(&echo->lock);
+}
+
+void db_echo_reference(db_echo *echo,const unsigned char *pcm,size_t bytes,uint64_t now) {
+    db_echo_reference_rate(echo,pcm,bytes,now,24000);
 }
 
 static double correlation(db_echo *echo,const unsigned char *pcm,uint64_t now,
@@ -142,8 +148,10 @@ int db_echo_filter(db_echo *echo,const unsigned char *pcm,int playing,uint64_t n
         double residual=energy*(1-fit);
         /* A later near-end frame can open the speech gate. Do not replay
          * older frames that were already identified as speaker echo. */
-        if(fit>=echo_floor && residual<=threshold)echo->echo_frames|=bit;
-        unsigned voiced=(uint64_t)energy>threshold && fit<echo_floor;
+        int reference_missing=echo->require_reference && fit<0;
+        if(reference_missing || (fit>=echo_floor && (echo->require_reference || residual<=threshold)))
+            echo->echo_frames|=bit;
+        unsigned voiced=(uint64_t)energy>threshold && fit<echo_floor && !reference_missing;
         unsigned recent=echo->strong_protection?255u:7u;
         unsigned votes=echo->strong_protection?4u:2u;
         echo->near_votes=((echo->near_votes<<1)|voiced)&recent;

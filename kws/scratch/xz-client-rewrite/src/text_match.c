@@ -174,6 +174,11 @@ int xz_text_is_echo(const char *observed, const char *spoken) {
     return edit_distance(left, left_len, right, right_len) * 100 <= longest * 28;
 }
 
+int xz_text_has_speech(const char *text, unsigned minimum) {
+    uint32_t normalized[XZ_TEXT_CODEPOINT_CAP];
+    return text && normalize(text, normalized) >= minimum;
+}
+
 static int phrase_in_text(const char *phrase, const char *text) {
     uint32_t needle[XZ_TEXT_CODEPOINT_CAP], hay[XZ_TEXT_CODEPOINT_CAP];
     size_t nlen, hlen;
