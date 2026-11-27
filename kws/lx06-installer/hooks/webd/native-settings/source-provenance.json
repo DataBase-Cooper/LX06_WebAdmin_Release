@@ -1,0 +1,287 @@
+{
+  "schema": "lx06-native-target-settings-source-promotion-v1",
+  "predecessors": {
+    "t16_normal_v1_manifest_sha256": "90f295f200bb84f5b707484aff378c45b537490694feb1d5f74f04c6d42365ff",
+    "original_joint_batch": "docs/plan/parallel-evidence/a/batch-20261114-target-settings-joint-manifest.json"
+  },
+  "inputs": [
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-config.c",
+      "sha256": "9fa6d2dd4f5c24bd96ec79cd96718d5174e33898181354756cf0a368c8444db1"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-config.h",
+      "sha256": "b2fe15dcd78d193220389a59fc87ac4a7a47f23a1eaf2e5ef5eca9c85707513c"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/bridge-view.c",
+      "sha256": "ff52dad7fb18fe4f21e5fa3bff02ea7330fc00865aa628abbc8d47c0ef05af5e"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/declaration-reader.c",
+      "sha256": "6a5dbb12864f278a3f325e6c03d75509de92acc315645fea0be980488bb730af"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/declaration-reader.h",
+      "sha256": "7bed2e5180075cf3f8472f1eee12fd5a9fd36a7b1baad0f0d976170508bd0eae"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-list-approval.h",
+      "sha256": "b574f90fb422106433a3997a43640c33aa3d8e7e11381ed8bfec15ac0f28b0f7"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/template-matcher.c",
+      "sha256": "9b1088e8b745a07d168e1c89b4505b77c2e9dac7581cd36cefd1429e5032acef"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/template-matcher.h",
+      "sha256": "e5ac2ee388f09e96595cae1fea30917932712050a799220fc7a1528bd97a608f"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/template-expression.h",
+      "sha256": "ce3089f5b2ea5c995fe989eff849d029e6a92db9edbb8370b63cda43f74ad234"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/template-expression.inc",
+      "sha256": "cc03212afdf5cb5ab810b3442d8bc70d675f07f956ac1c2f83e5e4808e5757dd"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/template-runtime.h",
+      "sha256": "cd275d51b52202ff03d99f3d1c5ace81ce012a6c18d3f243843a9d1f6ec49b85"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/template-runtime.inc",
+      "sha256": "78e4e49059258e62090c993836feae9e8e86ec5f0fcb32dd92674c083ba84eaf"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/listen-window.c",
+      "sha256": "3bc317ab2bd91c607722f853a03fa1ffdcd54108fa09d0185b1429acafad1e8e"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/listen-window.h",
+      "sha256": "4af0213919a6c5d93a1ad93336a7070f741667abb583baa280afbc4e5379a050"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-expression.inc",
+      "sha256": "cf665146cdac573fa184dc6cafc3740184eff4cea0504a2f7ae890c86d8a8597"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/declaration-expression.inc",
+      "sha256": "19e15f35215d96d45ed37380acbcd222333fbbafa5efec7e5bf9d71b3cb20a73"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/declaration-expression.h",
+      "sha256": "ce2a4fdf9a56f4189fdfcb6b62bdb2c6934c7841e0fe83191d7847b27e40beef"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-helper.inc",
+      "sha256": "c2ea8b4f11944b51b5d825f420268e4bda8b9ff89e9a013e5991b9ddddedf87e"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-store.c",
+      "sha256": "2eeb4aa2aea143b51d370337f1aecc49cbe2167f3f9e08798e4f19c2371484f4"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-store-root.inc",
+      "sha256": "d93605c195d27675e3f2e37bcf4d804eb442f5bade39f5f9f4eceecf352e3637"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-catalog.inc",
+      "sha256": "1a682e8519848f8333cfdd2dee29c9fa443d22330396866b0c110399ab4c83ba"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/recognition-policy.h",
+      "sha256": "a65b0f0f6a9ae6bde881c174dcce9c26151dcd77a61238a2639f3bcdf38c6083"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/recognition-policy.inc",
+      "sha256": "3cbdfc8fc5495ab215a125156fcb39a516cfe24e6d5d2f69a318ac2bf743272f"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/recognition-record.inc",
+      "sha256": "b2d921283964d848b31b6a0be9338d141e448128f3109c0ef28a5e5ea9fde698"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/recognition-startup-schema.inc",
+      "sha256": "f9405ae88668b964ce13ca0cd69318f3b2af7d502b128d2492896dd17f5c556a"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/recognition-owner.inc",
+      "sha256": "cb2c9181deb81389cd775974674beb2f9147a5e1d57eecbdefcbc5540a358499"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/recognition-selection.inc",
+      "sha256": "a830fc74d89190879ed861ab1da7c260077c08c6f6245b9bc25fe52d1a35ee39"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-selection.inc",
+      "sha256": "814571ffce5ce286f47e8dfce584fa63a593a43578c6ea41a506b500733dde04"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-writer.inc",
+      "sha256": "1fc9590608c4202446dc114dfd38520911e0a9e1d47f641a8152b0c4281de90f"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-wake-review.inc",
+      "sha256": "1779623282a2dc6e0340b17ec3b1d19ca71c7287fdcf78767d55eb3c283a91c2"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-wake-mutation.inc",
+      "sha256": "99e377e66e5618e586a908b593a5957fa27d2ec5ac1e10a144f28f7f776839e2"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/recognition-unbind.inc",
+      "sha256": "80b7b9c59de17d34559ac45af8fe50e7d311fe0f8f8a3e9db635e82f87f85954"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/recognition-readback.inc",
+      "sha256": "2ea1aba8c18bf8fe22b12a772260d46b8b4cfe90dde5888b1bdae0112580dd8d"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/recognition-target-source.inc",
+      "sha256": "97274c094c00994b577a8f800c30176e76bc06b5f39f219e62901aaafb01a724"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/recognition-target-view.inc",
+      "sha256": "b45c7e37b52a52f1d4b835cd4ed203d0ff94ecfca34ddad12d9b4117133d3ab7"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/recognition-target-view-api.inc",
+      "sha256": "1fd840979a9aa58a60a66a58995596fc316d468897b27273db0c9d750aabb137"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/target-settings-joint-api.inc",
+      "sha256": "94eb2f3f197fca3374438bbb331bc8a07e474cc7e5681f87045ce8c0a9124e83"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/recognition-declaration-review.inc",
+      "sha256": "b24ea854f57cd25cfaa2d5a600da4884df2c997f3bfa336bf5389e71cdc82fd4"
+    },
+    {
+      "origin": "t16-normal-v1-materialized/phone-source/ctl-owner.inc",
+      "sha256": "cf37baa8a67e99340f60d0cc0c4deb7ba316c6aa94f3fa30078ddcdbc4145188"
+    },
+    {
+      "origin": "A-target-settings-joint-fixed-4/materialized/recognition/uninstall-catalog-policy.generated.h",
+      "sha256": "430bcf1fd7cd36d7828bf0c705d25a08afcb61c27cc1cec2d802399f88c5eea1"
+    },
+    {
+      "origin": "A-target-settings-joint-fixed-4/materialized/recognition/generated-settings-view.generated.h",
+      "sha256": "d18ca9cbe6217b951e2e5a4457c06143f2fdf94e4fad16fcda51804ae01276d1"
+    },
+    {
+      "origin": "A-target-settings-joint-fixed-4/materialized/recognition/uninstall-catalog-projection.generated.h",
+      "sha256": "80fa11e38a88ec0ce54abf4dc1fa4891c497aa01afd5a70fd32e63c5871da68f"
+    },
+    {
+      "origin": "A-target-settings-joint-fixed-4/materialized/recognition/target-source-extension.generated.h",
+      "sha256": "1c6b626558f5d060a81d8d972de6a12237f79269f84401612a82a958d1b522f5"
+    },
+    {
+      "origin": "A-target-settings-joint-fixed-4/materialized/recognition/target-view-load.generated.h",
+      "sha256": "b2713d2e146e5fcf3f3b16c224fd4cb96b1a417abf9837e55463c7fe613f6c86"
+    },
+    {
+      "origin": "A-target-settings-joint-fixed-4/materialized/recognition/target-preview.generated.h",
+      "sha256": "b9cd8abff2a662b93c98fdaed94485a2f9b9282b25f672f0b355f4307d212541"
+    },
+    {
+      "origin": "A-target-settings-joint-fixed-4/materialized/recognition/target-joint.generated.h",
+      "sha256": "4087c171b444bff4be99bc97b71a1aaf2e31b527eff3eaa4624a457a3938eb84"
+    },
+    {
+      "origin": "A-target-settings-joint-fixed-4/materialized/recognition/selection-appmeta.generated.h",
+      "sha256": "e10eca52c94f7cf6278215ed52637b931ffee3073ea8eea994e9d272e91e04fa"
+    },
+    {
+      "origin": "A-target-settings-joint-fixed-4/materialized/recognition/joint-unbind-original.generated.h",
+      "sha256": "ba414f76f381d79e83b5531f74ccc4731aa94740d93d19b527b40a87edf903ba"
+    },
+    {
+      "origin": "A-target-settings-joint-fixed-4/materialized/recognition/joint-wake-readers.generated.h",
+      "sha256": "c1cae48c545f74b85fb1f07302dcf031eb1ff41e57dd9c56c5108e8948be28f9"
+    },
+    {
+      "origin": "A-target-settings-joint-fixed-4/materialized/recognition/script-settings.c",
+      "sha256": "287e31ef2ce4166ea89e25745ba6264a1d1475a352f62c79efc66bac687ae425"
+    },
+    {
+      "origin": "docs/plan/parallel-evidence/a/settings-draft/token-sync-profile.h",
+      "sha256": "3db378377ff58bf366e124bdaba56635a97ec155617b28972dc0ddbd08c55a97"
+    },
+    {
+      "origin": "docs/plan/parallel-evidence/a/settings-draft/static-branch-review.inc",
+      "sha256": "201eeef3b87df9e814e2bef03e04110c622aa6485d00bd7e7119d20ffc725c46"
+    }
+  ],
+  "outputs": {
+    "bridge-view.c": "ff52dad7fb18fe4f21e5fa3bff02ea7330fc00865aa628abbc8d47c0ef05af5e",
+    "ctl-catalog.inc": "e84b83d86fc0855d2984470d3ff3c7f3ffc56080c0332b977ad525d7713f5498",
+    "ctl-config.c": "67beb051b5e75bebd11ff92c429eeb6c67daa6c611257064f58c7e33402d8132",
+    "ctl-config.h": "18750d80c93b91b5b653425ae04e23254d8a535a226a4f6f33d3d142571c07a4",
+    "ctl-expression.inc": "b23bcbd773dc967274d4449fa9d7b8d1fa868de287d308ebf904c23ec7a90656",
+    "ctl-helper.inc": "a37d0a3c7057682efeeb9572625d7d9a04648b76215dc0a35ed2cdf79c68d19c",
+    "ctl-list-approval.h": "b574f90fb422106433a3997a43640c33aa3d8e7e11381ed8bfec15ac0f28b0f7",
+    "ctl-owner.inc": "268691e01e564aecfec39e196d7e927649cbf1546ec4b0b58ef7b0dd042a8bdb",
+    "ctl-selection.inc": "dfdb4b97d61e85fe1e2847e9511eebdbbad4a14eec6d51d53c6cf6eef76b838d",
+    "ctl-store-root.inc": "388f327f15b894522d2dd4040b7f67e847511111c067b4d04b1c184288cde344",
+    "ctl-store.c": "efc6d69f084aac4b30039f9928b81a1e0441a7cfaa8253c9fe54161e97bc2e6d",
+    "ctl-wake-mutation.inc": "b12d966fdee5f2f4eb06ecf6906212f4efa4425f571c4667069924a2f1c22a8d",
+    "ctl-wake-review.inc": "1b1027e30e0a8800e2d5c2da866a282be76117aafda25193d434fa25bb2ac474",
+    "ctl-writer.inc": "8bf07f41165815410b5457975028958bf7cb90050e130223053b1bddf739fb81",
+    "declaration-expression.h": "baea535674cb7f691f08c8b43c797914bfa2b9a0c3235f89f8f68d3069c95819",
+    "declaration-expression.inc": "19e15f35215d96d45ed37380acbcd222333fbbafa5efec7e5bf9d71b3cb20a73",
+    "declaration-reader.c": "26ffd9654f9dfc93fe47d6c58e03f1e061d3a9452a251330f071bdfd7dcde087",
+    "declaration-reader.h": "f0f228c777942340490cf45bf627728a66e49434a5bac58eb794e6c846d41aec",
+    "generated-settings-view.generated.h": "908ade1ee37211713faed5066acbd73c616274c4efa08040998de33691fd3d5a",
+    "joint-unbind-original.generated.h": "57fc5539b6a2e90be1f6400bafcf7d8d25afe0725d75a7ee024e8108bf1b469e",
+    "joint-wake-readers.generated.h": "0b36622556268d1b605f1aaa6fd92d591d3cf74bd266cd5a87427f538ecc18d3",
+    "recognition-catalog.inc": "b6340b7ce768a6fdd8b63f2e0dca9bbf8bc2f1d73d84898e836fca70e9f1af2d",
+    "recognition-declaration-review.inc": "c3c203aded2f10dcbec78331e7f4eeb1a490df90bedcb0331e95c5a8b325e595",
+    "recognition-owner.inc": "f47580a3b86e1a0b7f3f582011679aca6f557bbcf1eaf74956bd281b4b19086d",
+    "recognition-policy.h": "ecb7ca92a6c3aeaffada0b1fa66b46e678af2a01f35ba74c65c9bd9df3326c67",
+    "recognition-policy.inc": "3cbdfc8fc5495ab215a125156fcb39a516cfe24e6d5d2f69a318ac2bf743272f",
+    "recognition-readback.inc": "62d968bf3e3c2b1bec9e09de1715422f3fed45dbf47ad6818755fdb6303170c8",
+    "recognition-record.inc": "8dd8c9543d5bb579ae55e7f8636f9012166eb9cff281e95600f111e3c29d3277",
+    "recognition-selection.inc": "4704c6fde5b1db8260348175ebc184f5cd82c191351c0a6dff506471ce38069d",
+    "recognition-startup-schema.inc": "f9405ae88668b964ce13ca0cd69318f3b2af7d502b128d2492896dd17f5c556a",
+    "recognition-target-source.inc": "c33cf493cf7570ce6464b8369d376766b8bc72ffba5207b1fc2208617aac3049",
+    "recognition-target-view-api.inc": "de35fd714317e352fa2ca013839a0d97344b4af46faf1dcf2a71a71045c34f46",
+    "recognition-target-view.inc": "60d5097b50cf19a53191c2e1551b72e2c51772675a1fd7dec3de49154f1e2c80",
+    "recognition-unbind.inc": "1d79d41b09a86475b119320f90a419301d82910cf23e3c81ece19aa8d077e2b5",
+    "selection-appmeta.generated.h": "e10eca52c94f7cf6278215ed52637b931ffee3073ea8eea994e9d272e91e04fa",
+    "settings-helper.inc": "2d909758ae6d39c5bb8b7ca34173cc35b56ddf87e12364e78ece9446eb4f7470",
+    "static-branch-review.inc": "b26885a86d82d968ea75fe966c4b3da8ec6f7b3c2868bd4b193b69949b5d820c",
+    "target-joint.generated.h": "4087c171b444bff4be99bc97b71a1aaf2e31b527eff3eaa4624a457a3938eb84",
+    "target-preview.generated.h": "b9cd8abff2a662b93c98fdaed94485a2f9b9282b25f672f0b355f4307d212541",
+    "target-settings-joint-api.inc": "37e7335a07362864d44f8b554d26372596245bbb744c6c333ed2233e8bbc988d",
+    "target-source-extension.generated.h": "1c6b626558f5d060a81d8d972de6a12237f79269f84401612a82a958d1b522f5",
+    "target-view-load.generated.h": "b2713d2e146e5fcf3f3b16c224fd4cb96b1a417abf9837e55463c7fe613f6c86",
+    "template-expression.h": "2b8709f94c53891c883242001a7d83574931abd97abb53f3061d68dd056a234e",
+    "template-expression.inc": "cc03212afdf5cb5ab810b3442d8bc70d675f07f956ac1c2f83e5e4808e5757dd",
+    "template-matcher.c": "877dcb5a7cfeff6ead72fe0e99d2a961bb5431c55663833ed5145af82d98d90d",
+    "template-matcher.h": "7802cbe9822dabc22fd6831e32eff5a0b3b43c68cfbd9c128c8d1fcb1f3245d7",
+    "template-runtime.h": "0ef37409d4edaae41662761e5841620b6e21a35fa06e97b4d8cc5c846e538542",
+    "template-runtime.inc": "78e4e49059258e62090c993836feae9e8e86ec5f0fcb32dd92674c083ba84eaf",
+    "token-sync-profile.h": "3db378377ff58bf366e124bdaba56635a97ec155617b28972dc0ddbd08c55a97",
+    "uninstall-catalog-projection.generated.h": "f26cb071dd0ce98e8ef37fa953aace7a57b2a07d61ed370a2e7724c852c36127"
+  },
+  "explicit_adaptations": [
+    "mandatory original isolated gates map to LX06_NATIVE_TARGET_SETTINGS; optional model/startup branches remain disabled",
+    "original full-source/full-public-sink transformations with current original profile fields and exact ownership transfer",
+    "real production source/directory/gate/catalog composition in app-target-settings.c",
+    "original static-branch protected checker reused in same native matcher translation unit",
+    "stock/native two matcher symbols separated; original JSON implementation shared with normal Web",
+    "source-declared LX06-RECOGNITION-FIELD identifier, unique and separate from schema/CTL reserved fields"
+  ],
+  "native_consumers_verified": true,
+  "normal_web_consumer": "separate Web owner validates original authenticated handler/caps",
+  "whole_T22_completed": false,
+  "device_runtime": false,
+  "external_provider_called": false,
+  "borrowed_web_caps": {
+    "path": "native-settings/token-sync-b16.c",
+    "sha256": "448000b303714a95553201365e39f66608a75d0b0d30d763af369f3b33eccc7b",
+    "owner": "speaker_model_local_review"
+  }
+}

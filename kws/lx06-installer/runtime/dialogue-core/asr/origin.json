@@ -1,0 +1,31 @@
+{
+  "source_manifest_sha256": "8759caffe758d0acbc624da9fdbbf48655ed117f699cd51315318eeb0df13a0f",
+  "files": {
+    "control_asr.c": {
+      "source": "build/rc24-production-source-attempt6/src/runtime/common/control_asr.c",
+      "source_sha256": "038f68e9cbabbf563ba87d088d399d24b222f77548b9627a503374f2691e60eb",
+      "sha256": "dadbdef134ac57c33dfc4b96121e8ebb26e93b72d51df7b6d13da34a7d9f40df",
+      "include_path_only_change": true
+    },
+    "control_asr.h": {
+      "source": "build/rc24-production-source-attempt6/src/runtime/common/control_asr.h",
+      "source_sha256": "3f0d21b801e4376e9761c6b89715c56675da61c616609372e6352a7264227140",
+      "sha256": "3f0d21b801e4376e9761c6b89715c56675da61c616609372e6352a7264227140",
+      "include_path_only_change": false
+    },
+    "question-endpoint-vad.c": {
+      "source": "build/rc24-production-source-attempt6/src/runtime/common/question-endpoint-vad.c",
+      "source_sha256": "72eb064e1abe2d6158884a8d79e8c13ba607bba53cd47a4541b823f0347b6088",
+      "sha256": "72eb064e1abe2d6158884a8d79e8c13ba607bba53cd47a4541b823f0347b6088",
+      "include_path_only_change": false
+    },
+    "question-endpoint-vad.h": {
+      "source": "build/rc24-production-source-attempt6/src/runtime/common/question-endpoint-vad.h",
+      "source_sha256": "b2b3f968f57125ea33a220280d087f130d4904001ead83ecfd7bc969241fa93d",
+      "sha256": "b2b3f968f57125ea33a220280d087f130d4904001ead83ecfd7bc969241fa93d",
+      "include_path_only_change": false
+    }
+  },
+  "vendor": "../vendor/libfvad",
+  "device_access": false
+}

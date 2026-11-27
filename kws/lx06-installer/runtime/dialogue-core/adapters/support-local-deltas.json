@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "origin_manifest_unchanged": true,
+  "files": [
+    {
+      "path": "support/xiaozhi/ws.c",
+      "base_sha256": "990a4ff4c44b14d7080032b5b69d03b915854efc686f87489a33afc472aadcc5",
+      "sha256": "6a9a358e58c6e04f1fa271a34f1f267d87aab3d9584f31b622facd5c22cd5ad7",
+      "reason": "Expose last exact 8-byte PONG token to the unified transport heartbeat; original source remains unchanged."
+    },
+    {
+      "path": "support/xiaozhi/ws.h",
+      "base_sha256": "32a1d2ce4ddbb411accbd8ff1b97d42dc460349790c12be3df2b6ab6b2d02ae7",
+      "sha256": "f5d601fb2f15f4f456d1f3722b85e541f83daf597021cd6bc47f7b961af389a2",
+      "reason": "Expose last exact 8-byte PONG token to the unified transport heartbeat; original source remains unchanged."
+    }
+  ]
+}

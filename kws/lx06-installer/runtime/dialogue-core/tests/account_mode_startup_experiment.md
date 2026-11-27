@@ -1,0 +1,7 @@
+# Experimental sealed account startup
+
+For `--account` only, explicitly setting `DC_ACCOUNT_SEALED_FD` to an inherited descriptor number opts into binding. The descriptor must refer to a fully sealed memfd containing a valid v1 declaration. Before opening the session, the controller binds the account runner to the startup epoch and obtains keyword/voice policy from that same descriptor; `MODEL_BARGE_ANY` cannot override it. Invalid descriptors, missing seals, undeclared/unknown or malformed declarations reject startup. Without the variable the existing settings-driven account behavior remains.
+
+The descriptor supplier is **not authenticated by this code**. No launcher creates or supplies it, and this interface is not evidence of trusted launcher integration, script provenance, full script dependency immutability, target compatibility or acoustic acceptance. It is experimental and not approved for deployment. Existing `account_snapshot_seam.md` describes an earlier design exploration, not this implementation's precise execution behavior.
+
+`test_account_mode_binding.c` invokes the production initialization helper, real session opening and real account runner with synthetic sealed memfds. It checks opposing settings, rejection of wrong epoch and successful execution under the session epoch. It does not execute full `main` startup or a trusted launcher. See the build command in its header.

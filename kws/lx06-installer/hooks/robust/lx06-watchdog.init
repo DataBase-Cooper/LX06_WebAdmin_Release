@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+# S70 lx06-watchdog：88/89 系统级看门狗（见 /usr/lib/lx06/lx06-watchdog.sh）。
+# 排在 S50 dropbear / S55 keeper / S60 user 之后启动；它负责“整机瘫痪”时
+# 重启前先把 init 开机自启动开关关掉，保证重启后 88/89 可用、用户代码不加载。
+# 本服务自身崩溃由 respawn 拉起，不影响 88/89。
+START=70
+STOP=10
+USE_PROCD=1
+start_service() {
+    procd_open_instance
+    procd_set_param command /bin/sh /usr/lib/lx06/lx06-watchdog.sh
+    procd_set_param respawn 30 5 5
+    procd_set_param stdout 0
+    procd_set_param stderr 0
+    procd_close_instance
+}

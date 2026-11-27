@@ -1,0 +1,25 @@
+--- squashfs-root/etc/inittab
++++ squashfs-root-patched/etc/inittab
+@@ -5,5 +5,5 @@
+ ::sysinit:/etc/init.d/rcS S boot
+ ::shutdown:/etc/init.d/rcS K shutdown
+ tts/0::askfirst:/bin/ash --login
+-ttyS0::askfirst:/bin/login
++ttyS0::askfirst:/bin/ash --login
+ tty1::askfirst:/bin/ash --login
+--- squashfs-root/etc/pam.d/common-auth
++++ squashfs-root-patched/etc/pam.d/common-auth
+@@ -8,10 +8,10 @@
+ # traditional Unix authentication mechanisms.
+ #
+ 
+-auth sufficient libmico-pam.so
+-account sufficient libmico-pam.so
++# auth sufficient libmico-pam.so
++# account sufficient libmico-pam.so
+ # here are the per-package modules (the "Primary" block)
+-# auth	[success=1 default=ignore]	pam_unix.so nullok_secure
++auth	[success=1 default=ignore]	pam_unix.so nullok_secure
+ # here's the fallback if no module succeeds
+ auth	requisite			pam_deny.so
+ # prime the stack with a positive return value if there isn't one already;

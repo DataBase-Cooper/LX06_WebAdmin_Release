@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "purpose": "protocol-only components; no microphone/player/control-word state",
+  "files": [
+    {
+      "path": "support/common/json.c",
+      "origin": "lx06-installer/runtime/doubao/src/json.c",
+      "origin_sha256": "e99c901a88d0fb239dbeee4d1192e3105ca43ff7fc212de8edad6ba52cb443e1",
+      "sha256": "e99c901a88d0fb239dbeee4d1192e3105ca43ff7fc212de8edad6ba52cb443e1",
+      "bytes": 8925,
+      "namespace_only": false
+    },
+    {
+      "path": "support/common/json.h",
+      "origin": "lx06-installer/runtime/doubao/src/json.h",
+      "origin_sha256": "815b67759df89890066bf58cc999adb8481473a9460f253d544268268de691a4",
+      "sha256": "815b67759df89890066bf58cc999adb8481473a9460f253d544268268de691a4",
+      "bytes": 963,
+      "namespace_only": false
+    },
+    {
+      "path": "support/common/ogg_audio.c",
+      "origin": "lx06-installer/runtime/doubao/src/ogg_audio.c",
+      "origin_sha256": "61c3248d523a6c714474bb9efbf764b7799c315c90de64b1f325d734d5bbbac2",
+      "sha256": "61c3248d523a6c714474bb9efbf764b7799c315c90de64b1f325d734d5bbbac2",
+      "bytes": 6686,
+      "namespace_only": false
+    },
+    {
+      "path": "support/common/ogg_audio.h",
+      "origin": "lx06-installer/runtime/doubao/src/ogg_audio.h",
+      "origin_sha256": "0147b505fb8ed159521cb07e7bf0cd3f798b1f3b252939a170eb08131dd2180f",
+      "sha256": "0147b505fb8ed159521cb07e7bf0cd3f798b1f3b252939a170eb08131dd2180f",
+      "bytes": 901,
+      "namespace_only": false
+    },
+    {
+      "path": "support/xiaozhi/protocol.c",
+      "origin": "scratch/xz-client-rewrite/src/protocol.c",
+      "origin_sha256": "e9370c724c381649eff30c7733835fc69c68e41826d7aef5118d0c6834a7b831",
+      "sha256": "e9370c724c381649eff30c7733835fc69c68e41826d7aef5118d0c6834a7b831",
+      "bytes": 6970,
+      "namespace_only": false
+    },
+    {
+      "path": "support/xiaozhi/protocol.h",
+      "origin": "scratch/xz-client-rewrite/src/protocol.h",
+      "origin_sha256": "c66969e80ff3f1b70b0daa34bb5d4aea5a9fb92c77f7d3b30473f2a296d7f9d0",
+      "sha256": "c66969e80ff3f1b70b0daa34bb5d4aea5a9fb92c77f7d3b30473f2a296d7f9d0",
+      "bytes": 830,
+      "namespace_only": false
+    },
+    {
+      "path": "support/xiaozhi/event.c",
+      "origin": "scratch/xz-client-rewrite/src/event.c",
+      "origin_sha256": "fb8fa89816478c9cdcf9cc1ef5fa7d750e28a930eabbe7156e19b16033bd43f6",
+      "sha256": "fb8fa89816478c9cdcf9cc1ef5fa7d750e28a930eabbe7156e19b16033bd43f6",
+      "bytes": 2446,
+      "namespace_only": false
+    },
+    {
+      "path": "support/xiaozhi/event.h",
+      "origin": "scratch/xz-client-rewrite/src/event.h",
+      "origin_sha256": "67d9248875c189e0ad45778779917af7f6f427a27ad11dcf26fe811faed42051",
+      "sha256": "67d9248875c189e0ad45778779917af7f6f427a27ad11dcf26fe811faed42051",
+      "bytes": 509,
+      "namespace_only": false
+    },
+    {
+      "path": "support/xiaozhi/session.h",
+      "origin": "scratch/xz-client-rewrite/src/session.h",
+      "origin_sha256": "a56ce3968830383bf9d6db295a9481b9e4a34db420547d81b35ce7916052ec01",
+      "sha256": "a56ce3968830383bf9d6db295a9481b9e4a34db420547d81b35ce7916052ec01",
+      "bytes": 1312,
+      "namespace_only": false
+    },
+    {
+      "path": "support/xiaozhi/opus_codec.c",
+      "origin": "scratch/xz-client-rewrite/src/opus_codec.c",
+      "origin_sha256": "b174c17d4a55f2431d9771517edf0fbc83684fb03aca59acd66ad0077159765b",
+      "sha256": "b174c17d4a55f2431d9771517edf0fbc83684fb03aca59acd66ad0077159765b",
+      "bytes": 2415,
+      "namespace_only": false
+    },
+    {
+      "path": "support/xiaozhi/opus_codec.h",
+      "origin": "scratch/xz-client-rewrite/src/opus_codec.h",
+      "origin_sha256": "1a2c1150b67da020b023b6bc43f926c8fa1b5d151c64320e4ed3ff4f7662e04f",
+      "sha256": "1a2c1150b67da020b023b6bc43f926c8fa1b5d151c64320e4ed3ff4f7662e04f",
+      "bytes": 666,
+      "namespace_only": false
+    },
+    {
+      "path": "support/xiaozhi/ws.c",
+      "origin": "scratch/xz-client-rewrite/src/ws.c",
+      "origin_sha256": "e4b1826d4225fafdbc4ff0f30519991c52b89f80a585d46da27bd08ff666bdbc",
+      "sha256": "990a4ff4c44b14d7080032b5b69d03b915854efc686f87489a33afc472aadcc5",
+      "bytes": 17228,
+      "namespace_only": true
+    },
+    {
+      "path": "support/xiaozhi/ws.h",
+      "origin": "scratch/xz-client-rewrite/src/ws.h",
+      "origin_sha256": "5d226a96aeb230521091115c7142cbff535fb8e052701780225384432f646c0c",
+      "sha256": "32a1d2ce4ddbb411accbd8ff1b97d42dc460349790c12be3df2b6ab6b2d02ae7",
+      "bytes": 990,
+      "namespace_only": true
+    },
+    {
+      "path": "support/xiaozhi/ws_frame.c",
+      "origin": "scratch/xz-client-rewrite/src/ws_frame.c",
+      "origin_sha256": "175b7adde42d150ee40841ffb01847ea85ff86f8049d7f661040180f3f313c6c",
+      "sha256": "97f0a6ebc165361f53a70ce330fe7e9ca8f926c7e787f5aa84d54866719dcabf",
+      "bytes": 3173,
+      "namespace_only": true
+    },
+    {
+      "path": "support/xiaozhi/ws_frame.h",
+      "origin": "scratch/xz-client-rewrite/src/ws_frame.h",
+      "origin_sha256": "a9f50b9305b01d517a8de535ce9d560e0853409d7127cc4d19ecbf168bf2ff45",
+      "sha256": "b623e8c9f596664ecd37d3b5ce48156af1e9209ed0e17298d193e2597093e624",
+      "bytes": 698,
+      "namespace_only": true
+    },
+    {
+      "path": "support/doubao/ws.c",
+      "origin": "lx06-installer/runtime/doubao/src/ws.c",
+      "origin_sha256": "e892e60e2a3f1b23045a1b91b618dccb52dbe94b840d10f66a6deab208124171",
+      "sha256": "c24e9ac0d73b551cc1899092f0b91d2aca78f340fbc0e60db283e38d19db95a2",
+      "bytes": 17281,
+      "namespace_only": true
+    },
+    {
+      "path": "support/doubao/ws.h",
+      "origin": "lx06-installer/runtime/doubao/src/ws.h",
+      "origin_sha256": "a982411da8358ed096d486bde7719f1b3b7d0ee0241ee8f1e4e1619c553e47f0",
+      "sha256": "ac58999e7948ce7d458d25063170b2d91685a952c2c060e221f6b78e45138011",
+      "bytes": 991,
+      "namespace_only": true
+    },
+    {
+      "path": "support/doubao/ws_frame.c",
+      "origin": "lx06-installer/runtime/doubao/src/ws_frame.c",
+      "origin_sha256": "175b7adde42d150ee40841ffb01847ea85ff86f8049d7f661040180f3f313c6c",
+      "sha256": "c338a3193319c69fca39c322e7946014be578c4150be65c77e570e390e2cc9fa",
+      "bytes": 3173,
+      "namespace_only": true
+    },
+    {
+      "path": "support/doubao/ws_frame.h",
+      "origin": "lx06-installer/runtime/doubao/src/ws_frame.h",
+      "origin_sha256": "a9f50b9305b01d517a8de535ce9d560e0853409d7127cc4d19ecbf168bf2ff45",
+      "sha256": "7cadc564ef0a9c2a9f901cd81367dd39da14d4437637bb54539143cbe121880b",
+      "bytes": 698,
+      "namespace_only": true
+    }
+  ]
+}

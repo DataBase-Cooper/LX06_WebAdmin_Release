@@ -1,0 +1,59 @@
+{
+  "contract_revision": 2,
+  "authority": "LX06 official revision 13",
+  "authority_commit": "18228d814707b913ae813707fdd9be4d5316e09d",
+  "authority_tag": "lx06-plan-official-rev13-20261112",
+  "authority_sha256": "be709e93b20fc58dc103db69f124aaaf3aa7f6014af7a84760f53a291a805461",
+  "wire": 1,
+  "bridge_wire": "v2.2",
+  "bridge_version": "2.0",
+  "hook_ipc": "hook/1.0",
+  "header_bytes": 48,
+  "payload_max": 8192,
+  "frames": {
+    "OPEN": 1,
+    "MIC": 2,
+    "CANCEL": 3,
+    "RESUME": 4,
+    "CLOSE": 5,
+    "GRANT": 6,
+    "READY": 32,
+    "TEXT": 35,
+    "AUDIO": 37,
+    "REPLY_END": 38,
+    "CANCEL_ACK": 39,
+    "ERROR": 40,
+    "RESUMED": 41,
+    "PING": 42,
+    "PONG": 43,
+    "STATE": 44,
+    "TASK": 45,
+    "WAKE": 46
+  },
+  "directions": {
+    "speaker": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      42,
+      43,
+      46
+    ],
+    "phone": [
+      6,
+      32,
+      35,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45
+    ]
+  }
+}

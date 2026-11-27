@@ -1,0 +1,59 @@
+#!/bin/sh
+# LX06 V43 监督循环（官方直连架构）· procd 实例（root，前台常驻）
+# V43：tap/mic/official-asr 全部退役。官方引擎↔云端客户端原生直连
+#（客户端 baked 绑 LAB2，引擎下行 ENOENT = 无双驱动 = 单播）。
+# 脚本降噪音频/录音/阈值测试统一走 vpm-feed fifo（16k PCM）。
+# 本循环只做：
+#   1. 起 start.sh（V43：幂等，清残留 tap/mic/official-asr + fifo/feed 保障）
+#   2. 巡检：mipns-xiaomi / mico_aivs_lab / vpm-feed 任一缺失 → 重跑 start.sh
+#   3. official-asr 复活即杀（tap 时代兜底，直连下 = 双播主因）
+# 逃生开关：/data/v31patch/V43-tap 存在时回旧双路由（固件旧版逻辑）。
+X=/usr/lib/lx06/xiaoai
+DATA=/data/open-xiaoai
+LOG=$DATA/launcher.log
+
+log() { echo "$(date '+%m-%d %H:%M:%S') $*" >> "$LOG"; }
+
+mkdir -p "$DATA"
+# 日志限长（保内存）
+[ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 131072 ] && mv -f "$LOG" "$LOG.1"
+
+if [ -f /data/v31patch/V43-tap ]; then
+    # 逃生：回到固件原版双路由监督逻辑
+    exec /data/v31patch/run.legacy.sh
+fi
+
+fails=0
+while :; do
+    if "$X/start.sh" >>"$LOG" 2>&1; then
+        fails=0
+        while :; do
+            e=$(pidof mipns-xiaomi 2>/dev/null)
+            c=$(pidof mico_aivs_lab 2>/dev/null)
+            f=$(pidof vpm-feed 2>/dev/null)
+            [ -z "$e" ] && { log "BREAK: mipns-xiaomi 缺失 → 重跑 start.sh"; break; }
+            # 开机窗口（前180s）：S61 才会拉 mico_aivs_lab，此间缺失不算故障
+            UP=$(cut -d. -f1 /proc/uptime)
+            [ -z "$c" ] && [ "${UP:-0}" -gt 180 ] && { log "BREAK: mico_aivs_lab 缺失 → 重跑 start.sh"; break; }
+            [ -z "$f" ] && { log "BREAK: vpm-feed 缺失 → 重跑 start.sh"; break; }
+            oa=$(pidof official-asr 2>/dev/null)
+            if [ -n "$oa" ]; then
+                for p in $oa; do kill "$p" 2>/dev/null; done
+                log "V43: official-asr 复活已杀（双播主因）"
+            fi
+            # 残留 tap/mic 复活同样清掉（防旧组件回灌）
+            for n in xaudio-tap xiaoai-mic; do
+                p=$(pidof "$n" 2>/dev/null)
+                if [ -n "$p" ]; then
+                    for q in $p; do kill "$q" 2>/dev/null; done
+                    log "V43: 残留 $n 已清"
+                fi
+            done
+            sleep 10
+        done
+    else
+        fails=$((fails + 1))
+        log "start.sh rc!=0 (fails=$fails)"
+    fi
+    sleep $([ $fails -ge 3 ] && echo 30 || echo 3)
+done

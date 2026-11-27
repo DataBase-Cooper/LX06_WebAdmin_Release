@@ -1,0 +1,16 @@
+[
+  "bridge_unreachable",
+  "token_invalid",
+  "bridge_connect_timeout",
+  "app_not_installed",
+  "hook_unavailable",
+  "hook_version_mismatch",
+  "app_version_unsupported",
+  "bridge_version_mismatch",
+  "session_missing",
+  "search_empty",
+  "op_timeout",
+  "script_disabled",
+  "unsupported",
+  "quota_exhausted"
+]

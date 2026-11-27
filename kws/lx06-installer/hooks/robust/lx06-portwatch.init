@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+# S65 lx06-portwatch：88/89 端口级自愈（见 /usr/lib/lx06/lx06-portwatch.sh）。
+# 排在 S60 user 之后、S70 watchdog 之前：单端口死 30s → restart dropbear
+# （每 boot 至多 3 次），抢在 S70 的 120s 整机重启之前自愈。
+# 本服务自身崩溃由 respawn 拉起，不影响 88/89。
+START=65
+STOP=15
+USE_PROCD=1
+start_service() {
+    procd_open_instance
+    procd_set_param command /bin/sh /usr/lib/lx06/lx06-portwatch.sh
+    procd_set_param respawn 30 5 5
+    procd_set_param stdout 0
+    procd_set_param stderr 0
+    procd_close_instance
+}

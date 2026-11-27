@@ -1,0 +1,13 @@
+#!/bin/sh /etc/rc.common
+# S50 dropbear（包含 web88）先起；S55 keeper 就绪后，S60 才申请一次用户自启。
+# 本服务只运行可信装配脚本；用户文件由 keeper 降权执行，不继承 root。
+START=60
+STOP=10
+USE_PROCD=1
+start_service() {
+    procd_open_instance
+    procd_set_param command /bin/sh /usr/lib/lx06/init-launch.sh
+    procd_set_param stdout 0
+    procd_set_param stderr 0
+    procd_close_instance
+}

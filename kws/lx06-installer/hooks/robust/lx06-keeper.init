@@ -1,0 +1,18 @@
+#!/bin/sh /etc/rc.common
+# S50 的 SSH/HTTP 先启动；keeper 失败只禁止用户扩展，不阻断系统服务。
+# 不改全局 sysctl；不接管硬件 watchdog；保活有上限，防崩溃拉起风暴。
+START=55
+STOP=40
+USE_PROCD=1
+PROG=/usr/bin/lx06-keeper
+NAME=lx06-keeper
+
+start_service() {
+
+  procd_open_instance
+  procd_set_param command "$PROG" daemon
+  procd_set_param respawn 60 5 3
+  procd_close_instance
+}
+
+

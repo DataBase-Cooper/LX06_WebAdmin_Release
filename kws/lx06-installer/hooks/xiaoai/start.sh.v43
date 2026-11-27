@@ -1,0 +1,423 @@
+#!/bin/sh
+# LX06 本地唤醒（xiaoai-mic）接管序列 · 幂等可重入 · root
+# V26：复原官方 KWS + localwakeup 对接（agent 已由 xiaoai-mic 替代）
+# V28：双路由 —— 唤醒词按配置分流：
+#   - 官方路线：speech 帧送 LAB2 speech.usock。common.usock 是登记/TTS
+#     通道，协议不同，原样转发会 unpack failed，不能当官方音频口。
+#   - 非官方路线：上行送到 xiaoai-mic（speech 协议，agent.usock）
+#   实现：mico_aivs_lab 打 LD_PRELOAD(tapbind.so) 补丁改绑
+#   /tmp/mico_aivs_lab2/usock/speech.usock，与 tap 占用的原生路径共存。
+#
+# 官方 KWS（VPM，mipns-xiaomi）引擎与「小爱同学」唤醒检测 100% 原厂：
+#   - 镜像内 /etc/init.d/pns 保持原厂（含 -r opus32）
+#   - 唤醒事件走原生 speech.usock 协议（DOWN_ENABLE_VOICE_WAKEUP）
+# 运行时改动（本脚本 apply，stop.sh/rollback 还原）：
+#   - pns 前端参数去掉 -r opus32（mic 需要 pcm16 流）
+#   - mico_aivs_lab env: XAOAI_LAB2=1 + LD_PRELOAD=tapbind.so（改绑 LAB2）
+#   - 原生路径 bind 保护 + 停/起 mico/pns（接管窗口期）
+#
+# 官方「小爱同学」唤醒事件按路由分流（tap route 文件，见 xaudio-tap.c 头注）；
+# mic 停止（stop.sh）后全链路恢复官方原生行为（云端小爱），无需重启。
+#
+# 顺序（错一步都会双抢 socket 或漏流）：
+#   0. 建 LAB2 目录 + 写路由默认文件
+#   1. 清前态：杀 mic/tap → umount 保护 → 停 pns/mico → 恢复全双工文件
+#   2. mic 起（绑 /tmp/xiaoai-agent/agent.usock；A13：mic 替代 agent，
+#      原生协议 REGISTER/codec，扇出 PCM）
+#   3. tap 代理起（绑原生路径 + fan-out + 双路由 --labpath）
+#   4. 恢复全双工文件（连续对话/中途打断/播放时录音）
+#   5. bind 保护原生路径（防 stray bind 破坏）
+#   5b. mico 打 LD_PRELOAD 补丁（bind mount 覆盖 init）
+#   6. 起 mico（真引擎改绑 LAB2）→ 打补丁 pns（sed 去 -r opus32）→ 起 pns
+#   7. 验证：mipns cmdline 无 opus32；mic 日志见 "registered"；LAB2 已 bind
+#
+# 任一步失败 → rollback：回官方链路（原生 pns/mico，全双工文件还原）。
+
+X=/usr/lib/lx06/xiaoai
+DATA=/data/open-xiaoai
+TAPRUN=/tmp/xiaoai-agent
+AGENTSOCK=$TAPRUN/agent.usock
+NSOCK=/tmp/mico_aivs_lab/usock/speech.usock
+LAB2SOCK=/tmp/mico_aivs_lab2/usock/speech.usock
+# 官方唤醒 / 链到官方的本地词走 common.usock，不走 speech.usock。
+COMMONSOCK=/tmp/mico_aivs_lab/usock/common.usock
+PNS=/etc/init.d/pns
+MICO=/etc/init.d/mico_aivs_lab
+FDFULL=/data/mipns/dialog_continuous
+FDDIS="$FDFULL.xiaoai-mic-disabled"
+TLOG=$DATA/tap.log
+MLOG=$DATA/mic.log
+DATA7=/data/lx06
+WWDATA=/data/wakeword
+
+log() { logger -t xiaoai -p user.info "$*"; echo "[xiaoai] $*"; }
+
+killcomm() {
+    # busybox 无 pkill 依赖：按 comm 精确杀（$1=进程名 $2=信号）
+    for p in /proc/[0-9]*; do
+        c=$({ tr '\000' ' ' < "$p/comm" 2>/dev/null; } 2>/dev/null) || continue
+        [ "$c" = "$1" ] && kill "-${2:-TERM}" "${p#/proc/}" 2>/dev/null
+    done
+}
+
+wait_gone() {
+    i=0
+    while [ -n "$(pidof "$1" 2>/dev/null)" ]; do
+        i=$((i + 1))
+        [ $i -gt 20 ] && { killcomm "$1" KILL; sleep 1; break; }
+        sleep 0.5
+    done
+}
+
+is_bindmount() {
+    awk -v m="$1" '$2 == m { f = 1 } END { exit !f }' /proc/mounts 2>/dev/null
+}
+
+umount_clean() {
+    # 原生 mipns 连着 NSOCK 时持有其 inode（dgram connected）→ umount EBUSY，
+    # 静默失败后下一轮 mount 叠成双挂载。先杀持有者再循环 umount 到干净。
+    # 自绑定的 socket 普通 umount 会一直 EBUSY，必须 -l 拆掉，否则 tap bind EADDRINUSE。
+    n=0
+    while is_bindmount "$1"; do
+        umount "$1" 2>/dev/null && continue
+        n=$((n + 1))
+        if [ "$n" -ge 3 ]; then
+            umount -l "$1" 2>/dev/null
+            sleep 0.2
+            continue
+        fi
+        killcomm mipns-xiaomi 2>/dev/null; wait_gone mipns-xiaomi
+        killcomm mico_aivs_lab 2>/dev/null; wait_gone mico_aivs_lab
+        sleep 0.3
+    done
+}
+
+restore_fdfull() {
+    [ -f "$FDDIS" ] && [ ! -f "$FDFULL" ] && mv -f "$FDDIS" "$FDFULL" 2>/dev/null
+}
+
+rollback() {
+    killcomm xaudio-tap; killcomm xiaoai-mic; killcomm official-asr
+    wait_gone xaudio-tap; wait_gone xiaoai-mic
+    /etc/init.d/pns stop >/dev/null 2>&1
+    wait_gone mipns-xiaomi
+    umount_clean "$PNS"
+    umount_clean "$NSOCK"
+    umount_clean "$MICO"
+    rm -f "$AGENTSOCK"
+    restore_fdfull
+    /etc/init.d/mico_aivs_lab start 2>/dev/null
+    /etc/init.d/pns start 2>/dev/null
+}
+
+# ---------- 0. 配置、日志、V28 路由/LAB2 准备 ----------
+# V28：xiaoai-agent（Rust）已剔除；mic 参数内置（见 xiaoai-mic.c），无 yaml。
+mkdir -p "$DATA" "$TAPRUN/taps"
+# LAB2 目录必须存在：tapbind 改绑前 lab 进程只按原生 appname mkdir，
+# LAB2 路径由本脚本保证（否则改绑 ENOENT）。
+mkdir -p "$(dirname "$LAB2SOCK")"
+# 默认上行始终 official。开关只关「小爱同学」四个字（wakeup.sh 门控），
+# 不改小爱云常连接，也不影响本地词链官方。
+echo official > "$TAPRUN/route.default"
+# 缺文件 = 开。只在没有这个文件时写成 1，不覆盖用户已经设过的 0/1。
+mkdir -p /data/wakeword
+[ -f /data/wakeword/official_xiaoai ] || printf '1\n' > /data/wakeword/official_xiaoai
+for L in "$TLOG" "$MLOG"; do
+    [ -f "$L" ] && [ "$(wc -c < "$L")" -gt 131072 ] && { mv -f "$L" "$L.1"; : > "$L"; }
+done
+
+# ---------- 0b. V29 开机烘焙：轻量接管 ----------
+# 镜像 pns + mico 带 lx06-baked 标记（构建时烘焙）时，开机顺序
+# S54(本服务) → S55 pns(pcm16) → S61 wireless→mico restart(LAB2)：
+# pns/mico 已是最终形态，无需停起（消除开机 xiaoai-mic 反复重启的风暴，
+# KWS 小爱同学在 S55 后即可用）。旧镜像（无标记）走原全程接管，行为不变。
+LIGHT=0
+if grep -q 'lx06-baked' "$PNS" 2>/dev/null && grep -q 'lx06-baked' "$MICO" 2>/dev/null; then
+    LIGHT=1
+    log "baked boot: light takeover (pns/mico 不停)"
+fi
+# ---------- 0c. V43: tap 撤出官方语音链路（20261026 单播实证） ----------
+# mic/tap 不再启动：官方引擎↔云端客户端恢复原生直连（客户端仍绑 LAB2，
+# 引擎下行 ENOENT = 无双驱动 = 单播）。脚本降噪音频/录音/阈值测试统一走
+# vpm-feed fifo（16k PCM，官方 DSP 降噪后）；本地词触发走引擎进程内垫片。
+# 逃生开关：touch /data/v31patch/V43-tap 后重启服务即回旧双路由架构。
+V43=1
+if [ -f /data/v31patch/V43-tap ]; then
+    V43=0
+    log "V43 escape: /data/v31patch/V43-tap 存在，回到旧 tap 双路由"
+fi
+
+
+
+# ---------- 1. 清前态 ----------
+# umount 必须在 pns/mico 停止之后：mipns 连着 NSOCK 时 umount EBUSY，
+# 静默失败 → 下轮 mount 叠成双挂载 → tap bind EADDRINUSE（V27 实证）。
+killcomm xaudio-tap; killcomm xiaoai-mic; killcomm official-asr
+wait_gone xaudio-tap; wait_gone xiaoai-mic
+if [ "$LIGHT" = "1" ]; then
+    : # baked：pns/mico 已在最终形态，不停
+else
+    /etc/init.d/pns stop >/dev/null 2>&1
+    wait_gone mipns-xiaomi
+    /etc/init.d/mico_aivs_lab stop >/dev/null 2>&1
+    wait_gone mico_aivs_lab
+fi
+# V43: squashfs S85 存根 644 不可执行（旧栈靠接管重启拉客户端，V43 不接管）
+# → bind V43 客户端 init（无 preload），缺客户端时直接拉起
+if ! grep -q 'init.d/mico_aivs_lab ' /proc/mounts 2>/dev/null; then
+    mount --bind /data/lx06/mico_aivs_lab.init /etc/init.d/mico_aivs_lab 2>/dev/null && log "V43: 客户端 init bind OK"
+fi
+if ! pidof mico_aivs_lab >/dev/null 2>&1; then
+    sh /etc/rc.common /etc/init.d/mico_aivs_lab start >/dev/null 2>&1
+    log "V43: mico_aivs_lab 已拉起 pid=$(pidof mico_aivs_lab)"
+fi
+umount_clean "$PNS"
+umount_clean "$NSOCK"
+umount_clean "$MICO"
+restore_fdfull
+rm -f "$AGENTSOCK"
+
+if [ "$V43" = "1" ]; then
+    log "V43: skip xiaoai-mic + xaudio-tap（官方直连，fifo 架构）"
+else
+# ---------- 2. mic（A13：替 agent 解析 pns 流+扇出 PCM；失败=配置/二进制问题，回滚） ----------
+# 最终镜像 baked 于 $X（直接执行）；测试设备镜像无 $X/xiaoai-mic stub 时
+# 直接执行 $DATA7/xiaoai-mic（comm=文件名 xiaoai-mic，pidof/killcomm 语义不变）。
+# 旧 bind 方案需 $X 内预置同名文件，squashfs 只读目录无法创建 → 不再使用。
+if [ -e "$X/xiaoai-mic" ]; then
+    MICBIN="$X/xiaoai-mic"
+elif [ -e "$DATA7/xiaoai-mic" ]; then
+    MICBIN="$DATA7/xiaoai-mic"
+else
+    log "FAIL: no xiaoai-mic ($X 与 $DATA7 均无)"
+    rollback
+    exit 1
+fi
+# 截断日志：让 step 7 的 "registered" 检查只针对本周期（防旧行误判）
+: > "$MLOG"
+# V30：mic stderr 并入 mic.log（旧行为继承 start.sh 输出；若上层某处是
+# 管道，logmsg 先写 stderr 会 SIGPIPE 静默死，RC=141 无日志可查）。
+"$MICBIN" --sock "$AGENTSOCK" --log "$MLOG" 2>>"$MLOG" &
+MWPID=$!
+i=0
+while [ ! -S "$AGENTSOCK" ]; do
+    i=$((i + 1))
+    [ $i -gt 40 ] && { log "FAIL: mic did not open $AGENTSOCK (see $MLOG)"; rollback; exit 1; }
+    if ! kill -0 "$MWPID" 2>/dev/null; then
+        wait "$MWPID" 2>/dev/null
+        log "FAIL: mic exited during startup rc=$? (see $MLOG)"
+        rollback; exit 1
+    fi
+    sleep 0.25
+done
+sleep 0.3
+
+# ---------- 3. tap 代理（绑原生路径 + fan-out + V28 双路由） ----------
+# mico 停掉后 /tmp/mico_aivs_lab 会消失。目录不在时 tap bind ENOENT，
+# 本脚本回滚，页面先 tap 缺失、再未启用、最后才已启用。
+mkdir -p "$(dirname "$NSOCK")" "$(dirname "$LAB2SOCK")" "$TAPRUN/taps"
+"$X/xaudio-tap" --listen "$NSOCK" --peer "$AGENTSOCK" --tapdir "$TAPRUN/taps" \
+    --labpath "$LAB2SOCK" --labclient "$TAPRUN/tap2lab.usock" \
+    --route "$TAPRUN/route" --rdef "$TAPRUN/route.default" >>"$TLOG" 2>&1 &
+i=0
+while [ ! -S "$NSOCK" ]; do
+    i=$((i + 1))
+    [ $i -gt 40 ] && { log "FAIL: tap proxy did not open $NSOCK"; rollback; exit 1; }
+    sleep 0.25
+done
+fi
+
+# ---------- 4. 恢复全双工（连续对话/中途打断/播放时录音） ----------
+restore_fdfull && log "full-duplex restored: $FDFULL"
+
+# ---------- 5. 保护原生路径 ----------
+# V30：LIGHT 模式不挂 NSOCK bind 保护。mico 已被烘焙改绑 LAB2（不会抢
+# 原生路径），而 pns 恒连 NSOCK → umount EBUSY → 每轮 umount_clean 杀
+# pns + lazy mount 残留 → tap EADDRINUSE → 开机 40s/cycle 重启风暴
+# （V20261024.1 实测 218 轮）。非 LIGHT（旧镜像 mico 抢原生路径）才挂。
+if [ "$LIGHT" = "1" ] || [ "$V43" = "1" ]; then
+    log "skip NSOCK bind-protect（LIGHT：mico 已绑 LAB2，pns 独占原生路径）"
+else
+    mount --bind "$NSOCK" "$NSOCK" 2>/dev/null || log "warn: bind-protect $NSOCK failed (non-fatal)"
+fi
+
+# ---------- 5b. mico 打 LD_PRELOAD 补丁（V28：真引擎改绑 LAB2） ----------
+# 原厂 init 为 CRLF 行尾：awk 统一归一化 LF（防 \r 混入 env 值：
+# LD_PRELOAD 文件名带 \r → ld.so 静默跳过 preload）。
+if [ "$LIGHT" = "1" ] || [ "$V43" = "1" ]; then
+    log "skip mico LD_PRELOAD 补丁（已烘焙进镜像）"
+elif [ -f "$MICO" ] && [ -f "$X/tapbind.so" ]; then
+    # 本机 procd fork 的 _procd_add_table 每次调用都新开同名对象 →
+    # 多条 procd_set_param env 只有最后一条生效（V28.1 实证：XAOAI_LAB2
+    # 被 LD_PRELOAD 覆盖丢失 → env 校验死循环重启 mico）。必须单条多参。
+    awk -v x="$X" '{ sub(/\r$/, "") }
+        /procd_set_param command \/usr\/bin\/mico_aivs_lab/ {
+            print
+            print "    procd_set_param env XAOAI_LAB2=1 LD_PRELOAD=" x "/tapbind.so"
+            next
+        }
+        { print }' "$MICO" > "$TAPRUN/mico" || { log "FAIL: patch mico (awk)"; rollback; exit 1; }
+    chmod 755 "$TAPRUN/mico"
+    mount --bind "$TAPRUN/mico" "$MICO" || { log "FAIL: bind mount patched mico"; rollback; exit 1; }
+elif [ -f "$X/tapbind.so" ]; then
+    log "warn: $MICO 缺失（跳过 LAB2 补丁，官方路由暂不可用）"
+fi
+
+# ---------- 6. mico + 补丁 pns（baked：两者已最终形态，跳过各自 start） ----------
+if [ "$LIGHT" != "1" ]; then
+/etc/init.d/mico_aivs_lab start >/dev/null 2>&1
+i=0
+while [ -z "$(pidof mico_aivs_lab 2>/dev/null)" ]; do
+    i=$((i + 1))
+    [ $i -gt 40 ] && { log "FAIL: mico_aivs_lab did not start"; rollback; exit 1; }
+    sleep 0.25
+done
+# V28 加固：procd 可能复用接管窗口前已起的实例（env 未注入 → 仍占原生
+# NSOCK → 与 tap 双抢）。验活实例必须带 XAOAI_LAB2，否则杀一次重起。
+MPID=$(pidof mico_aivs_lab 2>/dev/null | awk '{print $1}')
+if [ -n "$MPID" ] && ! tr '\000' '\n' < "/proc/$MPID/environ" 2>/dev/null | grep -q "XAOAI_LAB2"; then
+    log "warn: mico 实例未注入 env（procd 旧实例），重启"
+    killcomm mico_aivs_lab KILL
+    wait_gone mico_aivs_lab
+    /etc/init.d/mico_aivs_lab start >/dev/null 2>&1
+    i=0
+    while [ -z "$(pidof mico_aivs_lab 2>/dev/null)" ]; do
+        i=$((i + 1))
+        [ $i -gt 40 ] && { log "FAIL: mico_aivs_lab did not start (retry)"; rollback; exit 1; }
+        sleep 0.25
+    done
+    MPID=$(pidof mico_aivs_lab 2>/dev/null | awk '{print $1}')
+fi
+# V28 验证：真引擎已改绑 LAB2（LD_PRELOAD 生效）。未 bind 时官方路由
+# 上行 ENOENT 丢包（本地路由不受影响）→ 仅告警不致命。
+i=0
+while [ $i -lt 80 ]; do
+    grep -q "$LAB2SOCK" /proc/net/unix 2>/dev/null && break
+    i=$((i + 1)); sleep 0.25
+done
+if grep -q "$LAB2SOCK" /proc/net/unix 2>/dev/null; then
+    log "LAB2 bound: $LAB2SOCK (官方路由就绪)"
+else
+    MPID=$(pidof mico_aivs_lab 2>/dev/null | awk '{print $1}')
+    if [ -n "$MPID" ] && tr '\000' '\n' < "/proc/$MPID/environ" 2>/dev/null | grep -q "XAOAI_LAB2"; then
+        log "warn: LAB2 未 bind（env 已注入，lab 可能 bind 中，稍后自愈）"
+    else
+        log "warn: LAB2 未 bind 且 env 未注入（LD_PRELOAD 补丁未生效，官方路由暂不可用）"
+    fi
+fi
+fi
+if [ "$LIGHT" != "1" ]; then
+sed 's/[[:space:]]-r[[:space:]]opus32//g' "$PNS" > "$TAPRUN/pns" || { log "FAIL: patch pns (sed)"; rollback; exit 1; }
+chmod 755 "$TAPRUN/pns"
+mount --bind "$TAPRUN/pns" "$PNS" || { log "FAIL: bind mount patched pns"; rollback; exit 1; }
+fi
+# V28.2 OFFICIAL-GATE: 补丁 /bin/wakeup.sh（bind mount）—「官方小爱同学」开关。
+# OFF → pns「小爱同学」KWS 的唤醒副作用（叮咚/LED/云上传）在 wakeup.sh 内统一屏蔽
+#       = 说「小爱同学」唤不醒；pns 仍常驻（唯一上行源），mico 官方云链路保持。
+# 补丁在固件 /usr/lib/lx06/wakeup.sh。不从 /data 热更新。
+WUP=/usr/lib/lx06/wakeup.sh
+if [ -f "$WUP" ]; then
+    case "$(grep ' /bin/wakeup.sh ' /proc/mounts 2>/dev/null | head -1)" in
+        *ubifs*) : ;;  # 已是 /data 版，避免重复叠层
+        *) mount --bind "$WUP" /bin/wakeup.sh || log "warn: bind mount wakeup.sh 失败（开关门控降级: OFF 仍有叮咚）" ;;
+    esac
+else
+    log "warn: wakeup.sh 补丁缺失（official_xiaoai 门控降级: OFF 仍有叮咚）"
+fi
+if [ "$LIGHT" != "1" ]; then
+/etc/init.d/pns start >/dev/null 2>&1
+i=0
+while [ -z "$(pidof mipns-xiaomi 2>/dev/null)" ]; do
+    i=$((i + 1))
+    [ $i -gt 40 ] && { log "FAIL: mipns-xiaomi did not start"; rollback; exit 1; }
+    sleep 0.25
+done
+sleep 2
+fi
+# mico 重启会在 /tmp/tts 留下 0 字节管道。播放器读到空管道，官方回复就没有声音。
+# 不重启 mibrain，只删空管道，并把被 pause 住的播放器放开。默认允许官方回复。
+for f in /tmp/tts/tts_*; do
+    [ -p "$f" ] || continue
+    rm -f "$f"
+done
+[ -f "$TAPRUN/official-reply.mute" ] || /usr/bin/mphelper play >/dev/null 2>&1
+# 空闲时 speech.usock 不送 PCM。vpm-feed 把官方 voip 麦流扇出到 tap，录音和本地 KWS 才有声音。
+# F2：pns 比 vpm-feed 新（如 stop.sh 重启过 pns）→ vpm-feed 还挂在旧 pns 的
+# 已删 fifo 上 → 2s dry 循环 7/8/2/5 事件风暴 → xaudio 4s 一 flap、voip flag
+# 挂死挡官方回复。pns 更新就重启 vpm-feed（新版会 attach pns 真实 fd）。
+FEED=""
+[ -x "$X/vpm-feed" ] && FEED="$X/vpm-feed"
+[ -z "$FEED" ] && [ -x /data/local-door/vpm-feed ] && FEED=/data/local-door/vpm-feed
+feed_pid=$(pidof vpm-feed 2>/dev/null)
+pns_pid=$(pidof mipns-xiaomi 2>/dev/null)
+feed_stale=0
+if [ -n "$feed_pid" ] && [ -n "$pns_pid" ]; then
+    fst=$(awk '{print $22}' /proc/$feed_pid/stat 2>/dev/null)
+    pst=$(awk '{print $22}' /proc/$pns_pid/stat 2>/dev/null)
+    [ -n "$fst" ] && [ -n "$pst" ] && [ "$pst" -gt "$fst" ] && feed_stale=1
+fi
+if [ -n "$FEED" ] && { [ -z "$feed_pid" ] || [ "$feed_stale" = "1" ]; }; then
+    [ -n "$feed_pid" ] && kill "$feed_pid" 2>/dev/null && sleep 1
+    /sbin/start-stop-daemon -S -b -m -p /var/run/vpm-feed.pid -x "$FEED"
+    [ -n "$feed_pid" ] && log "vpm-feed restarted (pns 更新)" || log "vpm-feed started"
+fi
+# 官方问句的云端回答已经到了，但对话号没登记，播放器会静音。
+# official-asr 看到最终识别结果后走 mibrain ai_service，这条路会登记并放行 TTS。
+# 不用 start-stop-daemon：设备 busybox 没有这个命令。
+# V43: official-asr 是 tap 时代的对话号登记兜底（tap 链下回答不登记会静音）。
+# 官方直连下登记原生完成，official-asr 反而二次驱动 TTS（双播实测主因）→ V43 停用。
+if [ "$V43" = "1" ]; then
+    if pidof official-asr >/dev/null 2>&1; then
+        killcomm official-asr; wait_gone official-asr
+        log "V43: official-asr stopped（双播主因，直连下冗余）"
+    fi
+elif [ -x "$X/official-asr" ] && ! pidof official-asr >/dev/null 2>&1; then
+    ( trap '' HUP; exec "$X/official-asr" >>/tmp/official-asr.log 2>&1 ) &
+    log "official-asr started"
+fi
+
+# ---------- 6.5 非 root 常驻应用权限维护（Web 部署的小智 xz_watch, 槽位 UID 61000+N） ----------
+# /tmp 每次上电重建: mico_aivs_lab 由引擎创建(750)、/tmp/tts 由 TTS 链路创建(755)、
+# taps 由 tap 创建(755)、/dev/snd 属 audio 组(660) → 槽位 UID 读不了 instruction.log/开不了 PCM →
+# 这里统一放宽（幂等; Web 部署脚本 xz_webdeploy.sh 安装时也做一遍, 双保险）。
+chmod 666 /dev/snd/* 2>/dev/null
+chmod 755 /tmp/mico_aivs_lab /tmp/mico_aivs_lab/usock 2>/dev/null
+mkdir -p /tmp/tts 2>/dev/null && chmod 777 /tmp/tts 2>/dev/null
+chmod 777 "$TAPRUN/taps" 2>/dev/null
+
+if [ "$V43" = "1" ]; then
+    log "V43 OK: 官方直连(无tap/mic) full-duplex=on fifo=on route=official(固定)"
+    exit 0
+fi
+
+# ---------- 7. 验证 ----------
+if [ "$LIGHT" = "1" ]; then
+    # pns 是 S55（本服务之后）：首启登记晚于本脚本，pns 已起才等，否则跳过
+    if [ -n "$(pidof mipns-xiaomi 2>/dev/null)" ]; then
+        i=0
+        while [ $i -lt 10 ]; do
+            grep -q "registered" "$MLOG" && break
+            grep -q "FATAL" "$MLOG" && break
+            i=$((i + 1)); sleep 0.5
+        done
+    fi
+else
+    MPID=$(pidof mipns-xiaomi 2>/dev/null | awk '{print $1}')
+    if [ -n "$MPID" ] && tr '\000' ' ' < "/proc/$MPID/cmdline" 2>/dev/null | grep -q "opus32"; then
+        log "FAIL: mipns-xiaomi still has -r opus32 (patch ineffective)"; rollback; exit 1
+    fi
+    i=0
+    while [ $i -lt 10 ]; do
+        grep -q "registered" "$MLOG" && break
+        grep -q "FATAL" "$MLOG" && break
+        i=$((i + 1)); sleep 0.5
+    done
+fi
+if grep -q "FATAL" "$MLOG"; then
+    log "warn: mic FATAL (tap 唤醒/KWS 仍可用，见 $MLOG)"; tail -2 "$MLOG"
+elif grep -q "registered" "$MLOG"; then
+    log "takeover OK: mic+tap live, full-duplex=on, opus32=off, route=$(cat "$TAPRUN/route.default")"
+else
+    log "warn: no register within 5s (本代固件 pns 无 agent 协议对端，属预期；tap 链路不受影响)"
+fi
+exit 0

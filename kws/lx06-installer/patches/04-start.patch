@@ -1,0 +1,12 @@
+--- squashfs-root/etc/rc.local	2024-12-06 15:11:58
++++ squashfs-root-patched/etc/rc.local	2025-02-13 22:06:13
+@@ -1,4 +1,9 @@
+ # Put your custom commands here that should be executed once
+ # the system init finished. By default this file does nothing.
+
++# 用户代码兜底入口：与 S60 同一个门控可信入口 init-launch.sh
++# （不再直连 /data/init.sh：总开关 OFF 时此处不执行任何用户代码——铁律；
++#  核心服务 88/89 由 S50/S65/S70 独立管理，与本行无关。）
++sh /usr/lib/lx06/init-launch.sh >/dev/null 2>&1 &
++
+ exit 0

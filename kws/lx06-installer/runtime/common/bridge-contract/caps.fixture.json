@@ -1,0 +1,64 @@
+{
+  "kind": "caps",
+  "bridge": true,
+  "bridge_version": "2.0",
+  "features": [
+    "hook.describe"
+  ],
+  "parameter_keys": [
+    "volume"
+  ],
+  "peer_ops": [
+    {
+      "op": "tts",
+      "params": {
+        "text": {
+          "type": "string",
+          "max": 256
+        }
+      }
+    }
+  ],
+  "apps": [
+    {
+      "app": "demo",
+      "hook_protocol": {
+        "min": "1.0",
+        "max": "1.0"
+      },
+      "audio": {
+        "mic": "none",
+        "speaker": "output",
+        "ring": "none"
+      },
+      "ops": [
+        {
+          "name": "search",
+          "params": {
+            "query": {
+              "type": "string",
+              "max": 64
+            }
+          },
+          "session": "keep",
+          "timeout_ms": 5000
+        },
+        {
+          "name": "choose",
+          "params": {
+            "index": {
+              "type": "enum",
+              "values": [
+                0,
+                1,
+                2
+              ]
+            }
+          },
+          "session": "end",
+          "timeout_ms": 10000
+        }
+      ]
+    }
+  ]
+}

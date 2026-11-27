@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小爱音箱Pro LX06 一键刷机工具</title>
+<style>
+:root{
+  --bg:#f4efe6;--paper:#fffaf3;--ink:#1d211f;--muted:#66706a;--line:#d8cfc1;
+  --soft:#efe7db;--accent:#c45c26;--accent-deep:#9a3f14;--good:#2f6b46;--bad:#a33b2d;
+  --shadow:0 10px 28px rgba(49,36,20,.08);--radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+  font:15px/1.55 "Segoe UI","Microsoft YaHei UI","PingFang SC","Noto Sans SC",sans-serif}
+button,input{font:inherit}
+button{cursor:pointer}
+.shell{display:grid;grid-template-columns:1fr;height:100%;min-width:0;min-height:0}
+.workspace{display:grid;grid-template-rows:minmax(0,1fr) auto;min-width:0;min-height:0;background:var(--bg)}
+.content{min-width:0;min-height:0;overflow-x:hidden;overflow-y:scroll;overflow-anchor:none;padding:22px 26px 28px}
+.page{display:grid;gap:18px;min-width:0;max-width:1120px;margin:0 auto}
+.head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+.head-copy{min-width:0;flex:1}
+.eyebrow{color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.head h1{margin:4px 0 6px;font-size:28px;line-height:1.2;overflow-wrap:anywhere}
+.head p{margin:0;color:var(--muted);font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+.head-note{flex:0 1 auto;max-width:240px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--muted);font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.flow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;min-width:0}
+.flow-step{display:grid;grid-template-rows:auto 12px;gap:12px;align-items:stretch;min-width:0;padding:14px 16px 16px;border:1px solid transparent;border-radius:14px;background:transparent;color:var(--muted)}
+.flow-step.locked{opacity:.42;pointer-events:none;cursor:default}
+.flow-step.clickable{cursor:pointer;transition:background .12s ease,border-color .12s ease}
+.flow-step.clickable:hover{background:rgba(31,27,22,.045);border-color:var(--line)}
+.flow-step .label{display:flex;align-items:center;gap:10px;min-width:0;color:var(--muted)}
+.flow-step .label .n{flex:0 0 auto;min-width:26px;height:26px;padding:0 8px;border-radius:999px;display:inline-grid;place-items:center;background:#efe7db;color:var(--ink);font-size:12px;font-weight:800;line-height:1;letter-spacing:.02em}
+.flow-step .label strong{flex:1 1 auto;min-width:0;font-size:15px;line-height:1.35;font-weight:700;overflow-wrap:anywhere;color:var(--ink)}
+.flow-step .bar{position:relative;height:12px;border-radius:999px;background:#ece5d9;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(49,36,20,.04)}
+.flow-step .bar i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:inherit;background:#d6cdc0;transition:width .25s ease}
+.flow-step.active{background:#fff8f2;border-color:#f0d0ba}
+.flow-step.active .label{color:var(--accent-deep)}
+.flow-step.active .label .n{background:var(--accent);color:#fff}
+.flow-step.active .label strong{color:var(--accent-deep)}
+.flow-step.active .bar{background:#f6e0d1}
+.flow-step.active .bar i{background:linear-gradient(90deg,#e08a4f,var(--accent))}
+.flow-step.done{background:#f4faf6;border-color:#d2e6d8}
+.flow-step.done .label .n{background:var(--good);color:#fff}
+.flow-step.done .label strong{color:#2a5b3d}
+.flow-step.done .bar{background:#dcefe3}
+.flow-step.done .bar i{background:linear-gradient(90deg,#6aa37c,var(--good))}
+.model-home-rule{display:flex;align-items:center;gap:10px;min-width:0;color:var(--muted);font-size:12px}
+.model-home-rule::before{content:"";width:28px;height:3px;flex:0 0 auto;border-radius:999px;background:var(--accent)}
+.panel{min-width:0;padding:22px 22px 24px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);box-shadow:var(--shadow)}
+.panel[hidden]{display:none!important}
+.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:16px;min-width:0}
+.panel-head h2{margin:0;font-size:18px;line-height:1.3;overflow-wrap:anywhere}
+.panel-head p,.hint{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.55;overflow-wrap:anywhere}
+.badge{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:999px;background:var(--soft);color:var(--muted);font-size:12px;font-weight:700;white-space:nowrap}
+.badge.ok{background:#e7f5ec;color:var(--good)}
+.badge.warn{background:#fff1e8;color:var(--accent-deep)}
+.badge.bad{background:#fdeceb;color:var(--bad)}
+.feedback{margin-top:0;padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:#fffdf9;color:var(--muted);font-size:13px;line-height:1.55;overflow-wrap:anywhere}
+.feedback[hidden]{display:none!important}
+.feedback.info{border-color:#d8cfc1;background:#fbf7f0;color:var(--muted)}
+.feedback.success{border-color:#c9dfd0;background:#f3faf5;color:#2a5b3d}
+.feedback.pending{border-color:#f0d0ba;background:#fff8f2;color:var(--accent-deep)}
+.feedback.error{border-color:#e7b4ad;background:#fff5f3;color:var(--bad)}
+#flashFeedback{height:68px;overflow-y:auto}
+.driver-preflight{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;min-height:128px;padding:22px;border:1px solid var(--line);border-radius:14px;background:#fbf7f0}
+.driver-preflight.ready{border-color:#c9dfd0;background:#f3faf5}
+.driver-preflight strong{display:block;font-size:15px}
+.driver-preflight .hint{margin-top:6px}
+.driver-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
+.driver-next-row{display:block;margin-top:14px;width:100%}
+.driver-next{display:flex;align-items:center;justify-content:center;min-height:48px;width:100%;font-size:15px;font-weight:800;letter-spacing:.02em}
+.firmware-grid{display:grid;grid-template-columns:1fr;gap:16px;min-width:0}
+.firmware-card{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;min-height:132px;padding:24px 22px;border:1px solid var(--line);border-radius:14px;background:#fffdf9}
+.firmware-card.recommend{border-color:#f1c5ad;background:linear-gradient(180deg,#fffaf4,#fff7f1)}
+.firmware-card.sshroot{border-color:#bfd9c8;background:linear-gradient(180deg,#f7fbf7,#f1f8f3)}
+.firmware-card.recommend:before{content:"官方";position:absolute;top:14px;right:22px;height:24px;padding:0 10px;border-radius:999px;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:800;background:#6d7b74}
+.firmware-card.sshroot:before{content:"推荐 · SSH";position:absolute;top:14px;right:22px;height:24px;padding:0 10px;border-radius:999px;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:800;background:var(--good)}
+.firmware-card h2{margin:0 40px 8px 0;font-size:21px;line-height:1.25;overflow-wrap:anywhere}
+.firmware-card p{margin:0;color:#4d514e;font-size:14px;line-height:1.7;overflow-wrap:anywhere}
+.firmware-meta{margin-top:10px;color:var(--muted);font-size:12px;line-height:1.5}
+.firmware-meta code{font-family:ui-monospace,Consolas,monospace;background:var(--soft);padding:1px 6px;border-radius:6px}
+.firmware-card .btn{min-width:118px;height:44px}
+.firmware-card.sshroot{grid-template-columns:1fr;align-items:start;gap:14px}
+.firmware-card.sshroot .btn{width:100%;justify-content:center}
+.modal{position:fixed;inset:0;display:none;place-items:center;padding:18px;background:rgba(29,33,31,.42);z-index:40}
+.modal.show{display:grid}
+.dialog{width:min(520px,100%);max-height:min(90vh,720px);overflow:auto;padding:20px;border-radius:16px;background:var(--paper);box-shadow:var(--shadow)}
+.dialog h3{margin:0 0 8px;font-size:20px;line-height:1.3;overflow-wrap:anywhere}
+.dialog p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.dialog-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:16px}
+.status-card{display:grid;gap:18px;min-width:0;min-height:200px;padding:24px 22px;border:1px solid var(--line);border-radius:14px;background:#fffdf9}
+.status-card.waiting{box-shadow:inset 0 0 0 1px rgba(196,92,38,.12)}
+.status-card.failed{border-color:#e7b4ad;background:#fff5f3}
+.status-card.complete{border-color:#c9dfd0;background:#f3faf5}
+.status-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}
+.status-top strong,.status-top span{display:block;overflow-wrap:anywhere}
+.status-top strong{height:3.1em;overflow-y:auto}
+.status-top span{margin-top:4px;color:var(--muted);font-size:13px}
+#flashHint{height:3.1em;overflow-y:auto}
+.percent-box{min-width:88px;padding:8px 12px;border-radius:12px;background:var(--soft);text-align:right}
+.percent-box b{display:block;font-size:24px;line-height:1}
+.percent-box small{color:var(--muted);font-size:11px}
+.stages{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:5px;min-width:0}
+.stage{min-width:0;padding:8px 6px;border:1px solid #e8dfd2;border-radius:999px;background:var(--soft);color:var(--muted);text-align:center;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .2s ease,border-color .2s ease,color .2s ease}
+.stage.active{border-color:#f0d0ba;background:#fff8f2;color:var(--accent-deep)}
+.stage.done{border-color:#d2e6d8;background:#f4faf6;color:#2a5b3d}
+.log-box{height:180px;min-height:180px;max-height:180px;overflow:auto;overflow-anchor:none;margin-top:4px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#1d211f;color:#e8e2d6;font:12px/1.6 ui-monospace,Consolas,"Microsoft YaHei UI",monospace;white-space:pre-wrap;word-break:break-all}
+.ssh-note{margin-top:14px;padding:12px 14px;border:1px dashed #bfd9c8;border-radius:12px;background:#f3faf5;color:#2a5b3d;font-size:13px;line-height:1.6}
+.ssh-note code{font-family:ui-monospace,Consolas,monospace;background:#e7f5ec;padding:1px 6px;border-radius:6px}
+.ssh-fixed-note{margin-top:2px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:4px 14px}
+.ssh-fixed-row{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:9px 0;border-bottom:1px solid var(--line)}
+.ssh-fixed-row:last-of-type{border-bottom:0}
+.ssh-fixed-row .k{font-size:13px;font-weight:700;color:#3f4642;letter-spacing:.02em}
+.ssh-fixed-row .v{font-size:15px;font-weight:800;color:#1c211f;font-family:ui-monospace,Consolas,monospace;word-break:break-all;text-align:right}
+.ssh-fixed-tip{margin:10px 0 12px;font-size:13px;line-height:1.65;color:#4a524e}
+.ssh-fixed-tip code{font-family:ui-monospace,Consolas,monospace;background:#f1f3f1;padding:1px 6px;border-radius:6px;font-weight:700}
+.wipe-row{display:flex;align-items:flex-start;gap:10px;margin-top:12px;padding:13px 15px;border:1px solid #e3c9a8;border-radius:12px;background:#fffaf3}
+.wipe-row input[type=checkbox]{width:18px;height:18px;margin:2px 0 0;accent-color:#c45c26;flex:none;cursor:pointer}
+.wipe-text{font-size:13px;line-height:1.55;color:#3f4642}
+.wipe-text b{font-size:14px;color:#1c211f}
+.wipe-text small{display:block;margin-top:3px;color:var(--muted)}
+.wipe-done{height:62px;overflow-y:auto;margin-top:0;padding:10px 13px;border-radius:10px;font-size:13px;font-weight:600;line-height:1.5}
+.wipe-done.yes{border:1px solid #c9dfd0;background:#f3faf5;color:#2a5b3d}
+.wipe-done.no{border:1px dashed #e8dfd2;background:#fffdf9;color:var(--muted)}
+.wipe-done.warning{border:1px solid #e7b4ad;background:#fff5f3;color:var(--bad)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 16px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);font-weight:700;white-space:nowrap}
+.btn:hover{background:#faf6f0}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn.primary{border-color:var(--accent);background:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-deep)}
+.btn.ghost{background:transparent}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(16px);max-width:min(520px,calc(100vw - 24px));padding:11px 15px;border:1px solid #b7d7c1;border-radius:12px;background:#e7f5ec;color:var(--good);opacity:0;pointer-events:none;transition:.2s ease;z-index:50;overflow-wrap:anywhere;text-align:center;box-shadow:var(--shadow)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.bad{border-color:#e7b4ad;background:#fdeceb;color:var(--bad)}
+.footer{display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;min-height:34px;padding:4px 22px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;min-width:0}
+.footer-copy{flex:1 1 180px;min-width:0}
+#footerStamp{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.footer-scale{display:flex;align-items:center;flex:0 1 auto;flex-wrap:wrap;gap:6px;min-width:0}
+.footer-scale-label{color:var(--muted);font-size:12px;font-weight:700}
+.zoom-presets{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-width:0}
+.zoom-preset{appearance:none;min-width:34px;height:26px;margin:0;padding:0 7px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink);font-size:11px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;transition:background .12s ease,border-color .12s ease,color .12s ease,box-shadow .12s ease}
+.zoom-preset:hover{border-color:#dfad8d;background:#fff2e9;color:var(--accent-deep)}
+.zoom-preset[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:#fff;box-shadow:0 1px 2px rgba(93,48,23,.16)}
+.zoom-preset:focus-visible{position:relative;z-index:1;outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:640px){
+  .head{flex-direction:column}
+  .flow{grid-template-columns:1fr}
+  .firmware-card{grid-template-columns:1fr}
+  .firmware-card .btn{width:100%}
+  .stages{grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+  .stage{font-size:10px;padding:6px 3px}
+  .panel{padding:16px}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <main class="workspace">
+    <div class="content">
+      <section class="page">
+        <div class="head">
+          <div class="head-copy">
+            <div class="eyebrow">XiaoAI speakers</div>
+            <h1>系统刷写 · 小爱音箱Pro LX06</h1>
+            <p>按 驱动检测 → 选择刷机包 → 刷机 三步操作；刷机包与 Amlogic USB 驱动都在软件同一目录。</p>
+          </div>
+          <div class="head-note">第 1 步驱动正常后，才能开始刷机</div>
+        </div>
+
+        <div class="flow" id="flashFlow">
+          <div class="flow-step active clickable" data-flash-step="1" onclick="goFlashStep(1)"><div class="label"><span class="n">1</span><strong>驱动检测</strong></div><div class="bar"><i></i></div></div>
+          <div class="flow-step clickable" data-flash-step="2" onclick="goFlashStep(2)"><div class="label"><span class="n">2</span><strong>选择刷机包</strong></div><div class="bar"><i></i></div></div>
+          <div class="flow-step" data-flash-step="3"><div class="label"><span class="n">3</span><strong>刷写进度</strong></div><div class="bar"><i></i></div></div>
+        </div>
+
+        <div class="model-home-rule">驱动检测/安装 → 选择刷机包 → 刷机</div>
+
+        <div class="feedback info" id="flashFeedback" aria-live="polite">正在检测 Amlogic USB 驱动，请稍候…</div>
+
+        <!-- Step 1: driver -->
+        <section class="panel" id="flashDriverPanel" data-flash-panel="1">
+          <div class="panel-head">
+            <div>
+              <h2>第 1 步 · Amlogic USB 驱动</h2>
+              <p>刷机使用 Amlogic Flash Tool 的 WorldCup（libusb）驱动。驱动未就绪时，选择刷机包按钮会保持禁用。</p>
+              <p>普通方式打开本软件即可。点击“安装驱动”后，在 Windows 管理员授权弹窗中选择“是”；标准用户需要管理员账号。没有看到弹窗时，请检查任务栏；远程桌面用户请同时检查本机屏幕。</p>
+            </div>
+            <span class="badge" id="flashDriverState">检测中</span>
+          </div>
+          <div class="driver-preflight" id="flashDriverPreflight">
+            <div>
+              <strong>WorldCup USB 驱动（VID_1B8E）</strong>
+              <p class="hint" id="flashDriverDetail">正在检测本机驱动状态…</p>
+            </div>
+            <div class="driver-actions">
+              <button class="btn" onclick="refreshFlashDriver()">重新检测</button>
+              <button class="btn primary" id="flashDriverInstall" onclick="installFlashDriver()">安装驱动（请求管理员授权）</button>
+            </div>
+          </div>
+          <div class="driver-next-row">
+            <button class="btn primary driver-next" id="flashDriverNext" onclick="setFlashStep(2)" disabled>下一步：选择刷机包</button>
+          </div>
+          <details id="flashDriverRecovery" style="margin-top:16px">
+            <summary>驱动签名安装帮助</summary>
+            <p>遇到驱动签名错误或设备代码 52 时，先保存电脑上的工作。打开 Windows 恢复设置，在「高级启动」中选「立即重新启动」。</p>
+            <p>依次选「疑难解答 → 高级选项 → 启动设置 → 重启」，再按 7 或 F7。进入 Windows 后重新打开本工具，点击「安装驱动」。这次选择只在本次启动有效。</p>
+            <button class="btn" id="flashDriverRecoveryOpen" onclick="openFlashDriverRecovery()">打开 Windows 恢复设置</button>
+          </details>
+          <details id="flashDriverLogs" style="margin-top:16px">
+            <summary>安装与检测日志</summary>
+            <div class="actions" style="justify-content:flex-end;margin:8px 0">
+              <button class="btn ghost" onclick="copyLogs()">复制日志</button>
+            </div>
+            <div class="log-box" id="driverLogBox">（暂无日志）</div>
+          </details>
+        </section>
+
+        <!-- Step 2: firmware -->
+        <section class="panel" id="flashFirmwarePanel" hidden data-flash-panel="2">
+          <div class="panel-head">
+            <div>
+              <h2>第 2 步 · 选择刷机包</h2>
+              <p>两种刷机包都会覆盖 system0 分区。用户数据只有勾选「清空 DATA」才会擦除，不勾选则原样保留。写入期间请勿拔线。</p>
+            </div>
+            <button class="btn ghost" id="flashBackToDriver" onclick="setFlashStep(1)">返回驱动检测</button>
+          </div>
+          <div class="firmware-grid" id="firmwareGrid">
+            <article class="firmware-card firmware-option" data-pkg="official">
+              <div>
+                <h2>官方固件</h2>
+                <p>基于官方 1.94.13。不含 SSH 和 Web88，保留官方使用方式。</p>
+                <div class="firmware-meta" data-meta="official"></div>
+              </div>
+              <button class="btn" data-start="official" onclick="openFlash('official')">开始刷机</button>
+            </article>
+            <article class="firmware-card firmware-option recommend sshroot" data-pkg="official-ssh">
+              <div>
+                <h2>官方固件 + SSH</h2>
+                <p>基于官方 1.94.13。开启 SSH89 和 Web88，支持独立上传用户脚本。刷完登录 http://&lt;音箱IP&gt;:88（默认密码 DB_COOPER）改密与部署脚本；两种打断模式的脚本已分别放入配套目录。</p>
+                <div class="firmware-meta" data-meta="official-ssh"></div>
+              </div>
+              <button class="btn primary" data-start="official-ssh" onclick="openFlash('official-ssh')">开始刷机</button>
+            </article>
+          </div>
+        </section>
+
+        <!-- Step 3: progress -->
+        <section class="panel" id="flashProgressPanel" hidden data-flash-panel="3">
+          <div class="panel-head">
+            <div>
+              <h2>第 3 步 · 刷写进度</h2>
+              <p>开始后：① 先插 USB 数据线 ② 再给小爱断电重上电。刷写完成后程序自动让小爱重启（U-Boot 复位），设备自动进入新系统，无需拔线。</p>
+            </div>
+            <div class="actions">
+              <button class="btn ghost" id="flashBackToFirmware" onclick="goFlashStep(2)">返回选择刷机包</button>
+            </div>
+          </div>
+          <div class="status-card" id="flashStatusCard">
+            <div class="wipe-done" id="wipeDone" hidden></div>
+            <div class="status-top">
+              <div>
+                <strong id="flashTask">等待开始</strong>
+                <span id="flashHint">等待开始</span>
+              </div>
+              <div class="percent-box">
+                <b id="flashPercent">0%</b>
+                <small>总体进度</small>
+              </div>
+            </div>
+            <div>
+              <div class="stages">
+                <div class="stage">识别设备</div>
+                <div class="stage" id="stageWipe" style="display:none">清空 DATA</div>
+                <div class="stage">设置启动延时</div>
+                <div class="stage">设置启动分区</div>
+                <div class="stage" id="stageBake" data-bake-only>烘焙 SSH 配置</div>
+                <div class="stage">写入系统</div>
+                <div class="stage">自动重启</div>
+              </div>
+              <div class="ssh-note" id="sshNote" hidden></div>
+            </div>
+          </div>
+          <div style="margin-top:16px">
+            <div class="actions" style="justify-content:space-between;margin-bottom:8px">
+              <strong style="font-size:13px;color:var(--muted)">刷机日志</strong>
+              <button class="btn ghost" style="min-height:32px" onclick="copyLogs()">复制日志</button>
+            </div>
+            <div class="log-box" id="logBox">（暂无日志）</div>
+          </div>
+        </section>
+      </section>
+    </div>
+
+    <footer class="footer">
+      <div class="footer-copy">
+        <span id="footerStamp">DB_COOPER</span>
+      </div>
+      <div class="footer-scale" aria-label="页面缩放">
+        <span class="footer-scale-label">界面缩放</span>
+        <div class="zoom-presets" id="pageZoomPresets" role="group" aria-label="页面缩放，选择 75% 到 200% 的预设">
+          <button class="zoom-preset" type="button" data-page-zoom="75" aria-pressed="false">75%</button>
+          <button class="zoom-preset" type="button" data-page-zoom="100" aria-pressed="true">100%</button>
+          <button class="zoom-preset" type="button" data-page-zoom="125" aria-pressed="false">125%</button>
+          <button class="zoom-preset" type="button" data-page-zoom="150" aria-pressed="false">150%</button>
+          <button class="zoom-preset" type="button" data-page-zoom="175" aria-pressed="false">175%</button>
+          <button class="zoom-preset" type="button" data-page-zoom="200" aria-pressed="false">200%</button>
+        </div>
+      </div>
+    </footer>
+  </main>
+</div>
+
+<div class="modal" id="sshModal">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="sshModalTitle">
+    <h3 id="sshModalTitle">开始刷写 · 官方固件 + SSH</h3>
+    <p>将覆盖 system0 分区。是否在写入前清空 DATA 分区（用户数据/网络配置），请勾选下方选项。确认后软件会提示您接好 USB 数据线，并给小爱断电后重新上电（重新供电一次）进入刷机模式。SSH 配置会烘焙进固件，开机即生效。</p>
+    <div class="ssh-fixed-note" aria-label="SSH 固定配置（零配置刷机）">
+      <div class="ssh-fixed-row"><span class="k">SSH 端口</span><span class="v">89（仅局域网）</span></div>
+      <div class="ssh-fixed-row"><span class="k">SSH 密码</span><span class="v">DB_COOPER</span></div>
+      <div class="ssh-fixed-row"><span class="k">HTTP 控制台</span><span class="v">http://&lt;音箱IP&gt;:88（同密码）</span></div>
+      <p class="ssh-fixed-tip">无需填写任何配置，直接点「确认开始刷机」即可。刷完后浏览器登录上方 HTTP 控制台（默认密码 <code>DB_COOPER</code>）可自行修改密码、上传部署脚本、重启小爱；修改密码即时生效，SSH 与 HTTP 共用同一密码。</p>
+    </div>
+    <div class="wipe-row" style="margin-top:14px">
+      <input type="checkbox" id="wipeChkModal">
+      <span class="wipe-text"><b>清空 DATA 分区（出厂数据重置）</b><small>设备识别后、写入系统前，先擦除音箱 DATA 分区：用户数据、网络配置、时间等全部恢复出厂。适合音箱进不了系统 / 黄灯卡死 / 想彻底重置时勾选；不勾选则保留原有用户数据。</small></span>
+    </div>
+    <div class="feedback info" id="sshModalFeedback" hidden aria-live="polite" style="margin-top:14px"></div>
+    <div class="dialog-actions">
+      <button class="btn" onclick="closeSSHModal()">取消</button>
+      <button class="btn primary" id="sshStartBtn" onclick="confirmSSHFlash()">确认开始刷机</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $=(s)=>document.querySelector(s);
+const $$=(s)=>Array.from(document.querySelectorAll(s));
+const firmwareNames={official:'官方固件','official-ssh':'官方固件 + SSH'};
+let flashStep=1,flashID='',flashStatus=null,lastFlashError='',flashStarting=false,driverStarting=false;
+const flashBusyMessage='正在刷机，请完成后再切换页面或关闭软件。请保持 USB 和电源连接。';
+
+function toast(text,bad=false){const el=$('#toast');el.textContent=text;el.className='toast show'+(bad?' bad':'');clearTimeout(toast.t);toast.t=setTimeout(()=>el.className='toast',3600)}
+function setFlashFeedback(message,kind='info'){const el=$('#flashFeedback');if(!el)return;if(!message){el.hidden=true;el.textContent='';return}el.hidden=false;el.textContent=message;el.className='feedback '+kind}
+function resetContentScroll(){const c=$('.content');if(c)c.scrollTop=0}
+
+function driverReady(){const d=flashStatus&&flashStatus.driver;return !!(d&&d.installed&&!d.busy&&!d.rebootRequired)}
+function flashActive(){return flashStarting||!!(flashStatus&&flashStatus.flash&&flashStatus.flash.active)}
+function flashDone(){const f=flashStatus&&flashStatus.flash;return !!(f&&f.done&&!f.active)}
+
+function setFlashStep(step){
+  let requested=Math.max(1,Math.min(3,Number(step)||1));
+  if(requested!==3&&flashActive()){toast(flashBusyMessage,true);return}
+  if(requested===2&&!driverReady()){
+    flashStep=1;
+    setFlashFeedback('Amlogic USB 驱动未就绪。请先点击"安装/修复驱动"，完成后再重新检测。','error');
+  }else if(requested===3&&!flashActive()&&!flashDone()){
+    flashStep=2;
+    setFlashFeedback('尚未开始刷机，请先在"选择刷机包"中点击"开始刷机"。','info');
+  }else{
+    flashStep=requested;
+    if(flashStep===1){
+      if(driverReady())setFlashFeedback('驱动已就绪。点击"下一步：选择刷机包"继续。','success');
+      else setFlashFeedback('Amlogic USB 驱动未就绪。请先点击"安装/修复驱动"，完成后再重新检测。','info');
+    }else if(flashStep===2){
+      setFlashFeedback('请选择要写入的刷机包。两种刷机包都会覆盖 system0 分区。用户数据只有勾选「清空 DATA」才会擦除。','info');
+    }
+  }
+  $$('.panel[data-flash-panel]').forEach(p=>{p.hidden=Number(p.dataset.flashPanel)!==flashStep});
+  resetContentScroll();updateFlashFlow();
+}
+async function goFlashStep(n){
+  if(n!==3){
+    if(flashActive()){toast(flashBusyMessage,true);return}
+    try{
+      const r=await fetch('/api/status',{cache:'no-store'});
+      if(!r.ok)throw new Error('status unavailable');
+      applyFlashStatus(await r.json());
+    }catch(e){toast('无法确认刷机状态，请稍后再切换页面。',true);return}
+    if(flashActive()){toast(flashBusyMessage,true);return}
+  }
+  if(flashStep===n)return;
+  setFlashStep(n);
+}
+window.addEventListener('beforeunload',e=>{
+  if(flashActive()||driverStarting||(flashStatus&&flashStatus.driver&&flashStatus.driver.busy)){e.preventDefault();e.returnValue=flashBusyMessage}
+});
+
+// Interpolate only to reported progress; never invent completion during a wait.
+let progressShown=0,progressTarget=-1,progressRun='',progressFrame=0;
+function renderProgress(f){
+  const run=f.startedAt||'';
+  if(run!==progressRun){cancelAnimationFrame(progressFrame);progressRun=run;progressShown=0;progressTarget=-1}
+  let target=Math.max(0,Math.min(f.active?99:100,Number(f.progress)||0));
+  if(f.active)target=Math.max(progressShown,target);
+  if(target===progressTarget)return;
+  progressTarget=target;cancelAnimationFrame(progressFrame);
+  const from=progressShown,start=performance.now();
+  const duration=window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:700;
+  function draw(now){
+    const t=duration?Math.min(1,(now-start)/duration):1;
+    progressShown=from+(target-from)*t;
+    $('#flashPercent').textContent=(t===1?String(target):progressShown.toFixed(1))+'%';
+    if(t<1)progressFrame=requestAnimationFrame(draw);
+  }
+  progressFrame=requestAnimationFrame(draw);
+}
+function updateFlashFlow(){
+  const done=flashDone();
+  const drvReady=driverReady();
+  $$('[data-flash-step]').forEach(el=>{
+    const step=Number(el.dataset.flashStep);
+    const isDone=step<flashStep||(done&&step<=3);
+    const isActive=step===flashStep&&!(done&&step<3);
+    el.classList.toggle('done',isDone);
+    el.classList.toggle('active',isActive&&!isDone);
+    // Gate: steps 2/3 stay hidden (locked) until the driver is ready, or a
+    // flash is already in flight/finished on a driver-ready machine.
+    const locked=step>=2&&!drvReady&&!(flashActive()||done);
+    el.classList.toggle('locked',locked);
+    el.classList.toggle('clickable',!locked);
+    const bar=el.querySelector('.bar i');
+    if(bar){bar.style.width=isDone?'100%':(isActive?(Math.round(step*100/3)+'%'):'0%')}
+  });
+}
+
+function renderDriver(driver){
+  const ready=!!(driver&&driver.installed),busy=driverStarting||!!(driver&&driver.busy),checking=!!(driver&&driver.checking);
+  const preflight=$('#flashDriverPreflight'),state=$('#flashDriverState'),detail=$('#flashDriverDetail'),install=$('#flashDriverInstall'),next=$('#flashDriverNext');
+  if(!preflight||!state||!detail)return;
+  preflight.classList.toggle('ready',ready);
+  state.textContent=busy?(driver&&driver.phase==='authorizing'?'等待授权':'安装中'):(driver&&driver.rebootRequired?'需重启':(ready?'已就绪':(checking?'检测中':'未就绪')));
+  state.className='badge '+(ready?'ok':(busy?'warn':'warn'));
+  let detailText;
+  if(driver&&driver.message){detailText=driver.message}
+  else if(checking){detailText='正在检测本机驱动，可能需要几秒，请稍候…'}
+  else if(driver&&driver.installed){detailText='驱动已安装'}
+  else if(driver){detailText='驱动未安装，点击右侧按钮安装'}
+  else{detailText='未能读取 Amlogic 驱动状态'}
+  detail.textContent=detailText+(busy&&driver&&driver.elapsedSeconds?'（已等待 '+driver.elapsedSeconds+' 秒）':'');
+  if(install){install.disabled=busy||checking||flashActive()||!!(driver&&driver.rebootRequired);install.hidden=false;
+    install.textContent=busy?(driver&&driver.phase==='authorizing'?'等待 Windows 授权…':'正在安装，请稍候…'):(ready?'修复驱动（管理员授权）':(driver&&driver.error?'重试安装（管理员授权）':'安装驱动（请求管理员授权）'))}
+  if(next)next.disabled=!driverReady()||busy||flashActive();
+  const recovery=$('#flashDriverRecovery'),recoveryOpen=$('#flashDriverRecoveryOpen');
+  if(recovery){
+    const phase=driver&&driver.phase||'';
+    recovery.hidden=ready||!!(driver&&driver.rebootRequired);
+    if(phase==='signature'&&recovery.dataset.phase!==phase)recovery.open=true;
+    recovery.dataset.phase=phase;
+  }
+  if(recoveryOpen)recoveryOpen.disabled=busy||flashActive();
+  const logs=$('#flashDriverLogs');
+  if(logs){
+    const phase=driver&&driver.phase||'';
+    if((phase==='driver-store'||phase==='signature')&&logs.dataset.phase!==phase)logs.open=true;
+    logs.dataset.phase=phase;
+  }
+  $$('.firmware-card button[data-start]').forEach(b=>{b.disabled=!driverReady()||flashActive()});
+  if(flashStep===1){
+    if(busy)setFlashFeedback(detail.textContent,'pending');
+    else if(ready)setFlashFeedback('驱动已就绪。点击"下一步：选择刷机包"继续。','success');
+    else if(driver&&driver.error)setFlashFeedback(driver.error,'error');
+    else if(checking)setFlashFeedback('正在检测本机驱动，请稍候…','pending');
+    else setFlashFeedback('Amlogic USB 驱动未就绪。请先点击"安装/修复驱动"，完成后再重新检测。','info');
+  }
+  updateFlashFlow();
+}
+
+function stageLayout(f){
+  // official package: 5-6 stages, official-ssh: +1 bake stage;
+  // both end with the auto-reboot stage (update.exe reset).
+  const ssh=f.packageID==='official-ssh';
+  // hide the bake stage for the plain official package
+  const bake=$('#stageBake');
+  if(bake)bake.style.display=ssh?'':'none';
+  // the wipe-DATA stage is only visible when this run has the option on
+  const wipe=$('#stageWipe');
+  if(wipe)wipe.style.display=f.wipeData?'':'none';
+  const all=$$('.stage').filter(x=>x.style.display!=='none');
+  return {ssh,all};
+}
+function applyFlashStatus(status){
+  flashStatus=status;
+  const f=status.flash||{};
+  const running=!!f.active;
+  const name=(firmwareNames[f.packageID]||'刷机任务');
+  let label='等待开始',hint='等待开始';
+  if(f.active){
+    label=name+' · '+(f.stepLabel||f.phase);
+    hint=f.message||'处理中';
+  }else if(f.done&&f.phase==='done'){
+    label=name+' · 刷写完成';
+    hint='系统写入完成，设备将自动重启，首次启动约 1 分钟。详细结果见刷机日志。';
+  }else if(f.done&&(f.phase==='error'||f.phase==='cancelled')){
+    label=name+' · '+(f.phase==='error'?'刷写失败':'已取消');
+    hint=f.message||f.error||'';
+  }
+  $('#flashTask').textContent=label;
+  $('#flashHint').textContent=hint;
+  renderProgress(f);
+  // stages
+  const complete=f.done&&f.phase==='done';
+  const fail=f.done&&(f.phase==='error'||f.phase==='cancelled');
+  const {ssh,all:stages}=stageLayout(f);
+  // backend step -> stage index (step 0=校验 shows no active stage)
+  // 勾选清空 DATA 时 step 2 被擦除占用、后续步骤号 +1：先折回基础号再映射
+  let activeStage=-1;
+  if(f.active){
+    const w=f.wipeData?1:0;
+    if(f.step===2&&f.wipeData){
+      activeStage=1; // 正在清空 DATA
+    }else{
+      const s=f.step<=1?f.step:f.step-w;
+      if(ssh){
+        if(s===1)activeStage=0;
+        else if(s===2)activeStage=1+w;
+        else if(s===3||s===4)activeStage=2+w;
+        else if(s===5)activeStage=3+w;
+        else if(s===6)activeStage=4+w;
+        else if(s>=7)activeStage=5+w;
+      }else{
+        if(s===1)activeStage=0;
+        else if(s===2)activeStage=1+w;
+        else if(s===3||s===4)activeStage=2+w;
+        else if(s===5)activeStage=3+w;
+        else if(s>=6)activeStage=4+w;
+      }
+    }
+  }
+  stages.forEach((x,i)=>{
+    const isDone=complete?true:(f.active?(i<activeStage):false);
+    x.classList.toggle('done',isDone);
+    x.classList.toggle('active',f.active&&i===activeStage);
+  });
+  if(complete)stages.forEach(x=>{x.classList.add('done');x.classList.remove('active')});
+  // card state
+  const card=$('#flashStatusCard');
+  card.classList.toggle('waiting',f.active&&f.step<=1+(f.wipeData?1:0));
+  card.classList.toggle('failed',fail);
+  card.classList.toggle('complete',complete);
+  // ssh note for ssh package (config is baked into the firmware — no IP needed)
+  const note=$('#sshNote');
+  if(f.packageID==='official-ssh'&&(f.active||complete)){
+    note.hidden=false;
+    note.innerHTML='SSH 与 HTTP 控制台已烘焙进固件，开机即生效（零配置：端口 89 / 密码 DB_COOPER / 仅局域网）。音箱联网后：<br><code>ssh root@&lt;音箱IP&gt;</code>，或浏览器打开 <code>http://&lt;音箱IP&gt;:88</code>（同密码）修改密码、上传部署脚本、重启小爱。';
+  }else{
+    note.hidden=true;
+  }
+  // wipe-DATA: 开始刷机前的确认弹窗里决定，这里只显示锁定状态 / 最终结果
+  const wipeDone=$('#wipeDone');
+  if(f.active||complete||fail){
+    wipeDone.hidden=false;
+    const wipeMessages={pending:'清空 DATA：已开启，等待设备识别后执行',running:'清空 DATA：正在执行，请保持连接',succeeded:'清空 DATA：已确认完成',unconfirmed:'清空 DATA：未收到擦除成功确认，请查看刷机日志'};
+    const result=f.wipeResult||(f.wipeData?'pending':'skipped');
+    wipeDone.textContent=f.wipeData?(wipeMessages[result]||wipeMessages.pending):'清空 DATA：未开启，保留原有用户数据';
+    if(f.wipeData&&f.wipeNotice)wipeDone.textContent+='。'+f.wipeNotice;
+    wipeDone.className='wipe-done '+(result==='succeeded'?'yes':(result==='unconfirmed'?'warning':'no'));
+  }else{
+    wipeDone.hidden=true;
+  }
+  renderDriver(status.driver);
+  if(f.active&&flashStep!==3)setFlashStep(3);
+  if(flashStep===3){
+    if(complete)setFlashFeedback(f.wipeResult==='unconfirmed'?'系统写入完成；DATA 擦除未确认成功，请查看日志后人工确认。':'刷写完成，请等待音箱启动，首次启动约 1 分钟。',f.wipeResult==='unconfirmed'?'error':'success');
+    else if(f.done&&f.phase==='error')setFlashFeedback('刷写失败，请查看进度卡片及刷机日志中的具体原因。','error');
+    else if(f.done&&f.phase==='cancelled')setFlashFeedback('已取消刷机。设备状态未变，可重新开始。','info');
+    else if(f.active&&f.step===0)setFlashFeedback('正在校验固件完整性（SHA256）…','pending');
+    else if(f.active&&f.step<=1)setFlashFeedback('等待设备：① 先把 USB 数据线插到小爱 Type-C 口（电脑端直插主板后置口）② 再给小爱断电、重新通电。','pending');
+    else if(f.active&&f.wipeData&&f.step===2)setFlashFeedback('正在清空 DATA 分区（出厂数据重置：用户数据 / 网络配置 / 时间等）…','pending');
+    else if(f.active&&f.phase==='reboot')setFlashFeedback(f.message||'正在确认自动重启，请保持连接…','pending');
+    else setFlashFeedback('正在刷写设备，请保持数据线连接，不要关闭软件。','pending');
+  }
+  renderPackageMeta(status.packages,status.initApps);
+  updateFlashFlow();
+}
+
+async function pollStatus(){
+  try{
+    const r=await fetch('/api/status',{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    applyFlashStatus(await r.json());
+  }catch(e){
+    setFlashFeedback('暂时无法读取状态，正在重试。若已开始刷机，请保持连接并等待，不要关闭软件。','error');
+  }
+}
+
+async function refreshFlashDriver(){
+  setFlashFeedback('正在重新检测 Amlogic USB 驱动，请稍候…','pending');
+  try{
+    const r=await fetch('/api/driver/status',{cache:'no-store'});
+    const body=await r.json().catch(()=>({}));
+    flashStatus=flashStatus||{flash:{}};
+    flashStatus.driver=body;
+    renderDriver(body);
+    if(flashStep===1&&flashStatus.driver.installed)setFlashFeedback('驱动已就绪。点击"下一步：选择刷机包"继续。','success');
+  }catch(e){
+    setFlashFeedback('驱动检测失败：'+(e.message||'未知错误')+'。请重新插拔 USB 或点击"安装/修复驱动"后重试。','error');
+  }
+}
+
+async function openFlashDriverRecovery(){
+  const button=$('#flashDriverRecoveryOpen');
+  if(button.disabled)return;
+  button.disabled=true;
+  try{
+    const response=await fetch('/api/driver/recovery',{method:'POST'});
+    const body=await response.json();
+    if(!response.ok||!body.ok)throw new Error(body.error||'无法打开 Windows 恢复设置');
+  }catch(e){
+    setFlashFeedback(e.message+'。也可在 Windows 设置中搜索「高级启动」。','error');
+  }finally{
+    renderDriver(flashStatus&&flashStatus.driver);
+  }
+}
+
+async function installFlashDriver(){
+  if(driverStarting||(flashStatus&&flashStatus.driver&&flashStatus.driver.busy))return;
+  driverStarting=true;
+  const button=$('#flashDriverInstall'),old=button&&button.textContent;
+  if(button){button.disabled=true;button.textContent='正在安装'}
+  setFlashFeedback('正在安装或修复 Amlogic 驱动，请确认桌面 UAC 弹窗…','pending');
+  try{
+    const r=await fetch('/api/driver/install',{method:'POST'});
+    const body=await r.json().catch(()=>({}));
+    if(!r.ok||!body.ok)throw new Error(body.error||'驱动安装未启动');
+    flashStatus=flashStatus||{flash:{}};
+    flashStatus.driver={...flashStatus.driver,busy:!!body.started,installed:!!body.already,phase:body.started?'authorizing':'done',message:body.message,error:''};
+    driverStarting=false;renderDriver(flashStatus.driver);
+    toast(body.message||'已请求授权，请确认 UAC 弹窗');
+  }catch(e){
+    driverStarting=false;
+    setFlashFeedback('驱动安装失败：'+(e.message||'未知错误')+'。请完成 Windows 弹窗后点击"重新检测"。','error');
+    if(button){button.disabled=false;button.textContent=old}
+    return;
+  }
+  // The existing status poll also reports driver phases; no second polling loop.
+}
+
+function collectSSH(){
+  // V19 零配置：恒 89 / DB_COOPER / 仅局域网，无任何用户输入。
+  return{port:89,password:'DB_COOPER',lanOnly:true};
+}
+function setSSHModalFeedback(message,kind='info'){const el=$('#sshModalFeedback');if(!el)return;if(!message){el.hidden=true;el.textContent='';return}el.hidden=false;el.textContent=message;el.className='feedback '+kind}
+function openSSHModal(){
+  setSSHModalFeedback('');
+  // V44 默认勾选：刷机包默认清空 DATA（启动链全在固件内，清空后自动重建
+  // /data/init.sh；本地唤醒词 MFCC 程序来自固件）。想保留配网/录音库
+  // 的开发设备手动取消勾选。
+  $('#wipeChkModal').checked=true;
+  $('#sshModal').classList.add('show');
+}
+function closeSSHModal(){$('#sshModal').classList.remove('show');setSSHModalFeedback('')}
+function confirmSSHFlash(){
+  const btn=$('#sshStartBtn');btn.disabled=true;
+  startFlash('official-ssh',collectSSH(),$('#wipeChkModal').checked);
+}
+function openFlash(id){
+  if(!driverReady()){setFlashStep(1);updateFlashFlow();setFlashFeedback('Amlogic USB 驱动未就绪。请先完成第 1 步。','error');return}
+  const pkg=(flashStatus&&flashStatus.packages||[]).find(x=>x.id===id);
+  if(!pkg||!pkg.present){setFlashStep(2);setFlashFeedback('刷机包不可用。请检查绿色版目录中 '+(id==='official'?'official':'official-ssh')+' 文件夹是否完整。','error');return}
+  if(flashActive()){setFlashStep(3);setFlashFeedback('已有刷机任务正在进行。','pending');return}
+  if(id==='official-ssh'){
+    openSSHModal();
+    return;
+  }
+  const ok=confirm('开始刷写：'+firmwareNames[id]+'\n\n将覆盖 system0 分区。\n开始后请接好 USB 数据线，并给小爱断电后重新上电（重新供电一次）进入刷机模式。');
+  if(!ok)return;
+  const wipe=confirm('是否清空 DATA 分区（出厂数据重置）？\n\n确定 = 清空（用户数据/网络配置/时间全部恢复出厂）\n取消 = 保留原有用户数据');
+  startFlash(id,null,wipe);
+}
+async function startFlash(id,ssh,wipe){
+  if(flashActive()){toast(flashBusyMessage,true);return}
+  flashStarting=true;
+  flashID=id;
+  const btns=$$('.firmware-card button[data-start]');btns.forEach(b=>b.disabled=true);
+  const reqBody={packageID:id,wipeData:!!wipe}; // 没勾选就是保留 /data
+  if(id==='official-ssh'&&ssh)reqBody.ssh={port:ssh.port,password:ssh.password,lanOnly:ssh.lanOnly};
+  try{
+    const r=await fetch('/api/flash/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(reqBody)});
+    const body=await r.json().catch(()=>({}));
+    if(!r.ok||!body.ok)throw new Error(body.error||'无法开始刷机');
+    flashStatus=flashStatus||{};
+    flashStatus.flash={active:true,packageID:id,phase:'connect',progress:0,step:0,wipeData:!!wipe,wipeResult:wipe?'pending':'skipped'};
+    flashStarting=false;
+    closeSSHModal();
+    applyFlashStatus(flashStatus);
+    setFlashStep(3);
+    toast('刷机已启动');
+  }catch(e){
+    flashStarting=false;
+    btns.forEach(b=>b.disabled=false);
+    if(ssh){
+      setSSHModalFeedback('开始刷机失败：'+(e.message||'未知错误')+'。可修改配置后重试，或点“取消”关闭。','error');
+      const btn=$('#sshStartBtn');if(btn)btn.disabled=false;
+    }else{
+      setFlashStep(2);
+      setFlashFeedback('开始刷机失败：'+(e.message||'未知错误'),'error');
+    }
+  }
+}
+
+// 清空 DATA 选项：在「确认开始刷机」弹窗里勾选（wipeChkModal），
+// 经 /api/flash/start 的 wipeData 字段一次性提交，不再有等待步骤二次修改。
+
+async function copyLogs(){
+  try{
+    const r=await fetch('/api/logs',{cache:'no-store'});
+    const body=await r.json().catch(()=>({}));
+    const text=(body.lines||[]).join('\n')||'（暂无日志）';
+    await navigator.clipboard.writeText(text);
+    toast('日志已复制到剪贴板');
+  }catch(e){toast('复制失败：'+e.message,true)}
+}
+
+function renderLogBox(lines){
+  // Both pages share the existing log poll; no extra connection/timer.
+  for(const id of ['#logBox','#driverLogBox']){
+    const box=$(id);
+    if(!box)continue;
+    const atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<24;
+    box.textContent=lines.length?lines.join('\n'):'（暂无日志）';
+    if(atBottom)box.scrollTop=box.scrollHeight;
+  }
+}
+
+async function pollLogs(){
+  try{
+    const r=await fetch('/api/logs',{cache:'no-store'});
+    const body=await r.json().catch(()=>({}));
+    renderLogBox(body.lines||[]);
+  }catch(e){}
+}
+
+function renderPackageMeta(packages, initApps){
+  (packages||[]).forEach(p=>{
+    const el=document.querySelector('.firmware-meta[data-meta="'+p.id+'"]');
+    if(!el)return;
+    const mb=p.size?(p.size/1048576).toFixed(1):'?';
+    const sha=p.sha256||'计算中…';
+    let html=present(p)?('大小 '+mb+' MB<br>SHA256 <code style="overflow-wrap:anywhere;white-space:normal;user-select:text">'+sha+'</code>'):'<span style="color:var(--bad)">固件缺失</span>';
+    if(present(p)){
+      const ver=p.version?p.version.replace(/^user-/,'').replace(/-release$/,''):'';
+      if(ver)html+='<br>版本 <b>'+ver+'</b>';
+    }
+    if(p.id==='official-ssh'&&present(p)){
+      const n=(initApps||[]).length;
+      html+='<br>开机自启：'+(n?('将安装 '+n+' 个程序（'+(initApps||[]).map(a=>a.name).join('、')+'）'):'把 .sh / 可执行程序放入 init-apps/ 文件夹即可开机自启');
+    }
+    el.innerHTML=html;
+  });
+}
+function present(p){return !!p.present}
+
+// ---- page zoom (native, via setNativePageZoom bound in Go) ----
+let pageZoom=100,pageZoomRevision=0;
+const pageZoomKey='lx06.pageZoom';
+function normalizePageZoom(v){const p=[75,100,125,150,175,200];let best=p[0];for(const c of p){if(Math.abs(c-v)<Math.abs(best-v))best=c}return best}
+function updatePageZoomControl(){$$('[data-page-zoom]').forEach(b=>{const sel=Number(b.dataset.pageZoom)===pageZoom;b.setAttribute('aria-pressed',String(sel));b.classList.toggle('selected',sel)})}
+function applyPageZoom(value,persist=true){
+  pageZoomRevision++;pageZoom=normalizePageZoom(value);updatePageZoomControl();
+  if(persist){try{localStorage.setItem(pageZoomKey,String(pageZoom))}catch(e){}}
+  if(typeof window.setNativePageZoom==='function'){
+    Promise.resolve(window.setNativePageZoom(pageZoom)).catch(()=>{});
+  }
+}
+function initPageZoom(){
+  $$('[data-page-zoom]').forEach(b=>b.addEventListener('click',()=>applyPageZoom(Number(b.dataset.pageZoom))));
+  let saved=100;try{const s=localStorage.getItem(pageZoomKey),n=Number(s);if(s!==null&&Number.isFinite(n))saved=n}catch(e){}
+  applyPageZoom(saved,false);
+}
+
+// ---- footer stamp from version ----
+function setFooterStamp(version){const el=$('#footerStamp');if(el&&version)el.textContent='DB_COOPER · '+version}
+
+// ---- boot ----
+initPageZoom();
+setFlashStep(1);updateFlashFlow();
+async function firstStatus(){try{const r=await fetch('/api/status',{cache:'no-store'});const b=await r.json();applyFlashStatus(b);renderPackageMeta(b.packages,b.initApps);setFooterStamp(b.version)}catch(e){}}
+firstStatus();
+pollLogs();
+setInterval(pollStatus,900);
+setInterval(pollLogs,1500);
+</script>
+</body>
+</html>
